@@ -13,6 +13,7 @@
 #include <errno.h>
 #include <CL/cl.h>
 #include "blake.h"
+#include "_kernel.h"
 
 typedef uint8_t		uchar;
 typedef uint32_t	uint;
@@ -835,9 +836,11 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
 	fatal("clCreateCommandQueue (%d)\n", status);
     /* Create program object */
     cl_program program;
-    char *source;
+    const char *source;
     size_t source_len;
-    load_file("kernel.cl", &source, &source_len);
+    //load_file("kernel.cl", &source, &source_len);
+    source = ocl_code;
+    source_len = strlen(ocl_code);
     program = clCreateProgramWithSource(context, 1, (const char **)&source,
 	    &source_len, &status);
     if (status != CL_SUCCESS || !program)

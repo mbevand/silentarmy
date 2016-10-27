@@ -29,11 +29,12 @@ and statistics in progressively more and more details.
 # Performance
 
 * 45.7 Sol/s with one R9 Nano
-* 39.6 Sol/s with one RX 480
+* 39.6 Sol/s with one RX 480 8GB
 
-Note: the code is currently very poorly optimized; it makes zero attempts to
-keep the queue of OpenCL commands full, therefore one needs to run 2 instances
-of SILENTARMY in parallel on the same GPU to keep it well utilized.
+Note: run 2 instances of SILENTARMY in parallel (eg. in 2 terminal consoles)
+on the same GPU to reach these performance numbers. The code is currently very
+poorly optimized; it makes zero attempts to keep the queue of OpenCL commands
+full, therefore 2 instances are needed to keep the GPU fully utilized.
 
 # Dependencies
 
@@ -101,9 +102,8 @@ solutions (with `NR_ROWS_LOG` set to 19), so it is less than 1% off the
 theoretical expected average number of solutions of 1.88 per Equihash
 run at n,k=200,9.
 
-For installing, just copy `silentarmy` and `kernel.cl` to a directory,
-and make it the current working direcotry working directory. The binary
-opens and reads `kernel.cl` at runtime.
+For installing, just copy `silentarmy` wherever. It has no dependencies;
+the OpenCL code is embedded in the binary.
 
 # Implementation details
 

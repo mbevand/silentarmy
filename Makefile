@@ -1,31 +1,36 @@
-# You may need to change this if the SDK was installed somewhere else
-AMDAPPSDK = /opt/AMDAPPSDK-3.0/include
+# Change this path if the SDK was installed in a non-standard location
+AMDAPPSDK = "/opt/AMDAPPSDK-3.0/include"
+# Change this path if your libOpenCL.so library is located elsewhere
+LIBOPENCL = "/usr/lib/x86_64-linux-gnu/amdgpu-pro/libOpenCL.so"
 
 CC = gcc
-CPPFLAGS = -std=c99 -pedantic -Wextra -Wall -ggdb \
+CPPFLAGS = -std=gnu99 -pedantic -Wextra -Wall -ggdb \
     -Wno-deprecated-declarations \
+    -Wno-overlength-strings \
     -I${AMDAPPSDK}
 LDFLAGS = -rdynamic
-LDLIBS = /usr/lib/x86_64-linux-gnu/amdgpu-pro/libOpenCL.so -lrt
+LDLIBS = ${LIBOPENCL}
 OBJ = main.o blake.o
-INCLUDES = blake.h param.h
+INCLUDES = blake.h param.h _kernel.h
 
 all : silentarmy
 
-silentarmy : ${OBJ} kernel.cl
+silentarmy : ${OBJ}
 	${CC} -o silentarmy ${OBJ} ${LDFLAGS} ${LDLIBS}
 
-${OBJ} : param.h
+${OBJ} : ${INCLUDES}
 
-kernel.cl: input.cl param.h
-	cpp -o $@ $<
+_kernel.h: input.cl param.h
+	echo 'const char *ocl_code = R"_mrb_(' >$@
+	cpp $< >>$@
+	echo ')_mrb_";' >>$@
 
 test: silentarmy
 	./silentarmy --nonces 100 -v -v 2>&1 | grep Soln: | \
 	    diff -u sols-100 - | cut -c 1-75
 
 clean :
-	rm -f silentarmy kernel.cl *.o _temp_*
+	rm -f silentarmy _kernel.h *.o _temp_*
 
 re : clean all
 
