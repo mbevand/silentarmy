@@ -64,7 +64,7 @@ class Solver(object):
         block_header_len = len(block_header)
         assert block_header_len == 140
         return library.gpu_solver__find_sols(self.solver_,
-                                             ffi.from_buffer(block_header),
+                                             ffi.cast('uint8_t*', ffi.from_buffer(block_header)),
                                              block_header_len,
                                              self.solutions_,
                                              self.max_solutions);
