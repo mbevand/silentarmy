@@ -7,7 +7,7 @@ library = None
 
 library_header = """
 struct gpu_solver__encoded_solution {
-  unsigned char bytes[1344];
+  uint8_t bytes[1344];
 };
 
 struct solution {
