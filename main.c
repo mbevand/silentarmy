@@ -318,28 +318,50 @@ void examine_ht(unsigned round, cl_command_queue queue, cl_mem buf_ht)
 	uint32_t star = 0;
 	if (round == 0)
 	  {
-	    show |= has_i(round, ht, row, 0x12d31f, 0xffffffffUL, &star);
+	    // i = 0x35c and 0x12d31f collide on first 20 bits
 	    show |= has_i(round, ht, row, 0x35c, 0xffffffffUL, &star);
+	    show |= has_i(round, ht, row, 0x12d31f, 0xffffffffUL, &star);
 	  }
 	if (round == 1)
 	  {
-	    show |= has_i(round, ht, row, 0xb6b71804, 0xffffffffUL, &star);
 	    show |= has_xi(round, ht, row, 0xf0937683, &star);
+	    show |= (row < 256);
 	  }
 	if (round == 2)
-	    show |= has_xi(round, ht, row, 0xe889d678, &star);
+	  {
+	    show |= has_xi(round, ht, row, 0x3519d2e0, &star);
+	    show |= (row < 256);
+	  }
 	if (round == 3)
+	  {
 	    show |= has_xi(round, ht, row, 0xd6950b66, &star);
+	    show |= (row < 256);
+	  }
 	if (round == 4)
+	  {
 	    show |= has_xi(round, ht, row, 0xa92db6ab, &star);
+	    show |= (row < 256);
+	  }
 	if (round == 5)
+	  {
 	    show |= has_xi(round, ht, row, 0x2daaa343, &star);
+	    show |= (row < 256);
+	  }
 	if (round == 6)
+	  {
 	    show |= has_xi(round, ht, row, 0x53b9dd5d, &star);
+	    show |= (row < 256);
+	  }
 	if (round == 7)
+	  {
 	    show |= has_xi(round, ht, row, 0xb9d374fe, &star);
+	    show |= (row < 256);
+	  }
 	if (round == 8)
+	  {
 	    show |= has_xi(round, ht, row, 0x005ae381, &star);
+	    show |= (row < 256);
+	  }
 	if (show)
 	  {
 	    debug("row %#x:\n", row);
