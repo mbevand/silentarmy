@@ -38,43 +38,49 @@ full, therefore 2 instances are needed to keep the GPU fully utilized.
 
 # Dependencies
 
-SILENTARMY performs best with AMD GPUs on 64-bit Linux with with the
-**AMDGPU-PRO Driver**. Its only build dependency is the OpenCL C headers from
-the **AMD APP SDK**.
+SILENTARMY has primarily been tested with AMD GPUs on 64-bit Linux with the
+**AMDGPU-PRO** driver (amdgpu.ko) or the **Radeon Software Crimson Edition**
+driver (fglrx.ko). Its only build dependency is the OpenCL C headers from the
+**AMD APP SDK**.
 
-Installation of the driver and SDK can be error-prone, so here is a
-step-by-step guide which has been tested on a pristine 64-bit Ubuntu 16.04
-machine:
+Installation of the drivers and SDK can be error-prone, so below are
+step-by-step instructions for Ubuntu 16.04 as well as Ubuntu 14.04.
+
+## Ubuntu 16.04
 
 1. Download the [AMDGPU-PRO Driver](http://support.amd.com/en-us/kb-articles/Pages/AMDGPU-PRO-Install.aspx)
-(as of 27 Oct 2016, the latest version is 16.30)
+(as of 30 Oct 2016, the latest version is 16.40)
 
-2. Extract it:\\
-   `$ tar xf amdgpu-pro_16.30.3-315407.tar.xz`
+2. Extract it:
+   `$ tar xf amdgpu-pro-16.40-348864.tar.xz`
 
-3. Fix a bug in AMD's scripts: edit `amdgpu-pro-install` and replace
-   `Packages.gz` with `Packages`, then uncompress the file:\\
-   `$ gunzip Packages.gz`
+3. Install (non-root, will use sudo access automatically):
+   `$ ./amdgpu-pro-install`
 
-4. Install (as root):\\
-   `$ sudo ./amdgpu-pro-install`
-
-5. Add yourself to the video group if not already a member:\\
+4. Add yourself to the video group if not already a member:
    `$ sudo gpasswd -a $(whoami) video`
 
-6. Reboot
+5. Reboot
 
-7. Download the [AMD APP SDK](http://developer.amd.com/tools-and-sdks/opencl-zone/amd-accelerated-parallel-processing-app-sdk/)
+6. Download the [AMD APP SDK](http://developer.amd.com/tools-and-sdks/opencl-zone/amd-accelerated-parallel-processing-app-sdk/)
 (as of 27 Oct 2016, the latest version is 3.0)
 
-8. Extract it:\\
+7. Extract it:
    `$ tar xf AMD-APP-SDKInstaller-v3.0.130.136-GA-linux64.tar.bz2`
 
-9. Install (non-root is fine, accept all the default options):\\
+8. Install system-wide by running as root (accept all the default options):
   `$ sudo ./AMD-APP-SDK-v3.0.130.136-GA-linux64.sh`
 
-10. Install a compiler and make which you will need to compile SILENTARMY:\\
+9. Install a compiler tools which you will need to compile SILENTARMY:
   `$ sudo apt-get install build-essential`
+
+## Ubuntu 14.04
+
+1. Install the official Ubuntu package:
+   `$ sudo apt-get install fglrx`
+   (as of 30 Oct 2016, the latest version is 2:15.201-0ubuntu0.14.04.1)
+
+2. Follow steps 5-9 above.
 
 # Compilation and installation
 
