@@ -1,3 +1,6 @@
+#ifndef _PARAM_H_
+#define _PARAM_H_
+
 #define PARAM_N				200
 #define PARAM_K				9
 #define PREFIX                          (PARAM_N / (PARAM_K + 1))
@@ -74,6 +77,10 @@
 */
 #define xi_offset_for_round(round)	(8 + ((round) / 2) * 4)
 
+typedef uint8_t		uchar;
+typedef uint32_t	uint;
+typedef uint64_t	ulong;
+
 // An (uncompressed) solution stores (1 << PARAM_K) 32-bit values
 #define SOL_SIZE			((1 << PARAM_K) * 4)
 typedef struct	sols_s
@@ -83,3 +90,5 @@ typedef struct	sols_s
     uchar	valid[MAX_SOLS];
     uint	values[MAX_SOLS][(1 << PARAM_K)];
 }		sols_t;
+
+#endif /* _PARAM_H_ */

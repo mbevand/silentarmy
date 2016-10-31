@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <inttypes.h>
+#include <stdbool.h>
 #include <assert.h>
 #include <sys/types.h>
 #include <sys/time.h>
@@ -18,8 +19,7 @@
 #include "_kernel.h"
 #include "sha256.h"
 
-typedef uint8_t		uchar;
-typedef uint32_t	uint;
+#include "silentarmy.h"
 #include "param.h"
 
 #define MIN(A, B)	(((A) < (B)) ? (A) : (B))
@@ -32,11 +32,6 @@ uint32_t	do_list_devices = 0;
 uint32_t	gpu_to_use = 0;
 uint32_t	mining = 0;
 
-typedef struct  debug_s
-{
-    uint32_t    dropped_coll;
-    uint32_t    dropped_stor;
-}               debug_t;
 
 void debug(const char *fmt, ...)
 {
@@ -836,7 +831,7 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
 	cl_mem *buf_ht, cl_mem buf_sols, cl_mem buf_dbg, size_t dbg_size,
 	uint8_t *header, size_t header_len, char do_increment,
 	size_t fixed_nonce_bytes, uint8_t *target, char *job_id,
-	uint32_t *shares)
+	uint32_t *shares, bool verify)
 {
     blake2b_state_t     blake;
     cl_mem              buf_blake_st;
@@ -901,8 +896,12 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
     global_ws = NR_ROWS;
     check_clEnqueueNDRangeKernel(queue, k_sols, 1, NULL,
 	    &global_ws, &local_work_size, 0, NULL, NULL);
-    sol_found = verify_sols(queue, buf_sols, nonce_ptr, header,
-	    fixed_nonce_bytes, target, job_id, shares);
+    /* Verify_sols function also prints the solutions and that is not
+     * what we always want */
+    if (verify) {
+        sol_found = verify_sols(queue, buf_sols, nonce_ptr, header,
+				fixed_nonce_bytes, target, job_id, shares);
+    }
     clReleaseMemObject(buf_blake_st);
     return sol_found;
 }
@@ -1093,8 +1092,8 @@ void run_opencl(uint8_t *header, size_t header_len, cl_context ctx,
     // Solve Equihash for a few nonces
     for (nonce = 0; nonce < nr_nonces; nonce++)
 	total += solve_equihash(ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
-		buf_sols, buf_dbg, dbg_size, header, header_len, !!nonce,
-		0, NULL, NULL, NULL);
+				buf_sols, buf_dbg, dbg_size, header, header_len, !!nonce,
+				0, NULL, NULL, NULL, true);
     uint64_t t1 = now();
     fprintf(stderr, "Total %" PRId64 " solutions in %.1f ms (%.1f Sol/s)\n",
 	    total, (t1 - t0) / 1e3, total / ((t1 - t0) / 1e6));
