@@ -26,15 +26,13 @@ unsigned int gpu_solver__find_sols(struct gpu_solver *self, uint8_t *header,
                                    unsigned int max_solutions);
 """
 
-def load_library(path=None):
+def load_library():
     global library, ffi
     assert library is None
 
     ffi = FFI()
     ffi.cdef(library_header)
 
-    if path is None:
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '')
     library = ffi.dlopen('libsilentarmy.so')
     assert library is not None
 
