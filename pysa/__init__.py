@@ -59,13 +59,16 @@ class Solver(object):
             load_library()
 
     def find_solutions(self, block_header):
+        """
+        @return a number of found solutions
+        """
         block_header_len = len(block_header)
         assert block_header_len == 140
         return library.gpu_solver__find_sols(self.solver_,
                                              ffi.cast('uint8_t*', ffi.from_buffer(block_header)),
                                              block_header_len,
                                              self.solutions_,
-                                             self.max_solutions);
+                                             self.max_solutions)
 
     def get_solution(self, num):
         assert(num >= 0 and num < self.max_solutions)
