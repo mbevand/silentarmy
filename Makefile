@@ -1,7 +1,7 @@
 # Change this path if the SDK was installed in a non-standard location
 AMDAPPSDK = "/opt/AMDAPPSDK-3.0/include"
 # Change this path if your libOpenCL.so library is located elsewhere
-LIBOPENCL = "/usr/lib/x86_64-linux-gnu/amdgpu-pro/libOpenCL.so"
+LIBOPENCL = "/opt/amdgpu-pro/lib/x86_64-linux-gnu/libOpenCL.so"
 
 CC = gcc
 CPPFLAGS = -std=gnu99 -pedantic -Wextra -Wall -ggdb \
