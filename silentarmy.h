@@ -50,4 +50,6 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
 
 uint32_t verify_sol(sols_t *sols, unsigned sol_i);
 
+void check_header_zero_pad(uint8_t *header);
+
 #endif /* SILENTARMY_H */

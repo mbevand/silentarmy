@@ -317,6 +317,10 @@ unsigned int gpu_solver__find_sols(struct gpu_solver *self, uint8_t *header,
   uint64_t total = 0;
 
   uint64_t t0 = now();
+
+  if (header_len == ZCASH_BLOCK_HEADER_LEN) {
+    check_header_zero_pad(header);
+  }
   solve_equihash(self->context, self->queue, self->k_init_ht,
 		 self->k_rounds, self->k_sols, self->buf_ht,
 		 self->buf_sols, self->buf_dbg, self->dbg_size,

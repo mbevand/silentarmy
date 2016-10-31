@@ -1271,6 +1271,18 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
 	fprintf(stderr, "Cleaning resources failed\n");
 }
 
+
+void check_header_zero_pad(uint8_t *header)
+{
+  for (unsigned int i = (ZCASH_BLOCK_HEADER_LEN - 12); i < ZCASH_BLOCK_HEADER_LEN; i++) {
+    if (header[i])
+      fatal("Error: last 12 bytes of full header (ie. last 12 "
+	    "bytes of 32-byte nonce) must be zero due to an "
+	    "optimization in my BLAKE2b implementation\n");
+  }
+}
+
+
 uint32_t parse_header(uint8_t *h, size_t h_len, const char *hex)
 {
     size_t      hex_len;
@@ -1292,12 +1304,9 @@ uint32_t parse_header(uint8_t *h, size_t h_len, const char *hex)
     assert(bin_len <= h_len);
     for (i = 0; i < bin_len; i ++)
 	h[i] = hex2val(hex, i * 2) * 16 + hex2val(hex, i * 2 + 1);
-    while (--i >= bin_len - N_ZERO_BYTES)
-	if (h[i])
-	    fatal("Error: last %d bytes of full header (ie. last %d "
-		    "bytes of 32-byte nonce) must be zero due to an "
-		    "optimization in my BLAKE2b implementation\n",
-		    N_ZERO_BYTES, N_ZERO_BYTES);
+    if (bin_len == opt0) {
+      check_header_zero_pad(h);
+    }
     return bin_len;
 }
 
