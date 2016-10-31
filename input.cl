@@ -670,7 +670,7 @@ void kernel_sols(__global char *ht0, __global char *ht1, __global sols_t *sols)
 #error "unsupported NR_ROWS_LOG"
 #endif
     if (tid == 0)
-	sols->nr = sols->likely_invalidss = 0;
+	sols->nr = sols->likely_invalids = 0;
     mem_fence(CLK_GLOBAL_MEM_FENCE); // for tid 0 initializing struct above
     a = htabs[ht_i] + tid * NR_SLOTS * SLOT_LEN;
     cnt = *(__global uint *)a;
@@ -687,7 +687,7 @@ void kernel_sols(__global char *ht0, __global char *ht1, __global sols_t *sols)
 		if (coll < sizeof (collisions) / sizeof (*collisions))
 		    collisions[coll++] = ((ulong)ref_i << 32) | ref_j;
 		else
-		    atomic_inc(&sols->likely_invalidss);
+		    atomic_inc(&sols->likely_invalids);
 	      }
     if (!coll)
 	return ;

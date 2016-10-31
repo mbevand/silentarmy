@@ -60,7 +60,7 @@
 typedef struct	sols_s
 {
     uint	nr;
-    uint	likely_invalidss;
+    uint	likely_invalids;
     uchar	valid[MAX_SOLS];
     uint	values[MAX_SOLS][(1 << PARAM_K)];
 }		sols_t;

@@ -678,7 +678,7 @@ uint32_t verify_sols(cl_command_queue queue, cl_mem buf_sols, uint64_t *nonce)
     fprintf(stderr, "Nonce %s: %d sol%s\n",
 	    s_hexdump(nonce, ZCASH_NONCE_LEN), nr_valid_sols,
 	    nr_valid_sols == 1 ? "" : "s");
-    debug("Stats: %d likely invalids\n", sols->likely_invalidss);
+    debug("Stats: %d likely invalids\n", sols->likely_invalids);
     free(sols);
     return nr_valid_sols;
 }
