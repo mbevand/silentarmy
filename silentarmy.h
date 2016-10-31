@@ -5,8 +5,8 @@
 
 #include <CL/cl.h>
 
+#include "silentarmy-types.h"
 #include "param.h"
-
 extern const char *ocl_code;
 
 typedef struct  debug_s {

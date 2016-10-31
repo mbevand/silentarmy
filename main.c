@@ -1047,7 +1047,7 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
                     &fixed_nonce_bytes);
         total += solve_equihash(ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
                 buf_sols, buf_dbg, dbg_size, header, ZCASH_BLOCK_HEADER_LEN, 1,
-                fixed_nonce_bytes, target, job_id, &shares);
+                fixed_nonce_bytes, target, job_id, &shares, true);
         total_shares += shares;
         if ((t1 = now()) > t0 + status_period)
           {
@@ -1301,6 +1301,7 @@ uint32_t parse_header(uint8_t *h, size_t h_len, const char *hex)
     return bin_len;
 }
 
+#ifndef SHARED_LIB
 enum
 {
     OPT_HELP,
@@ -1412,3 +1413,4 @@ int main(int argc, char **argv)
     init_and_run_opencl(header, header_len);
     return 0;
 }
+#endif
