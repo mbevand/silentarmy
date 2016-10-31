@@ -538,6 +538,9 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
 	     + adj);
 	dropped_stor += xor_and_store(round, ht_dst, tid, i, j, a, b);
       }
+    if (round < 8)
+	// reset the counter in preparation of the next round
+	*(__global uint *)(ht_src + tid * NR_SLOTS * SLOT_LEN) = 0;
 #ifdef ENABLE_DEBUG
     debug[tid * 2] = dropped_coll;
     debug[tid * 2 + 1] = dropped_stor;

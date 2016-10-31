@@ -706,7 +706,8 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
       {
 	if (verbose > 1)
 	    debug("Round %d\n", round);
-	init_ht(queue, k_init_ht, buf_ht[round % 2]);
+	if (round < 2)
+	    init_ht(queue, k_init_ht, buf_ht[round % 2]);
 	if (!round)
 	  {
 	    check_clSetKernelArg(k_rounds[round], 0, &buf_blake_st);
