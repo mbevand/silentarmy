@@ -1,4 +1,4 @@
-# Version 2
+# Version 2 (30 Oct 2016)
 
 * Support GCN 1.0 / remove unaligned memory accesses (because of this bug,
   previously SILENTARMY always reported 0 solutions on GCN 1.0 hardware)
