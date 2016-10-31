@@ -261,7 +261,7 @@ size_t gpu_solver__extract_valid_solutions(struct gpu_solver *self,
 					   struct gpu_solver__encoded_solution sols[],
 					   unsigned int max_solutions)
 {
-  uint32_t counted;
+  uint32_t counted = 0;
   sols_t *all_sols;
   uint32_t nr_valid_sols;
 
