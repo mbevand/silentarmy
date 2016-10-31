@@ -14,15 +14,16 @@
 ** round 7, table 1: cnt(4) i(4) i(4) i(4) i(4)      pad(0.5) Xi( 5.5) pad(6)
 ** round 8, table 0: cnt(4) i(4) i(4) i(4) i(4) i(4) pad(0)   Xi( 3.0) pad(5)
 **
+** If the first byte of Xi is 0xAB then:
+** - on even rounds, 'A' is part of the colliding PREFIX, 'B' is part of Xi
+** - on odd rounds, 'A' and 'B' are both part of the colliding PREFIX, but
+**   'A' is considered redundant padding as it was used to compute the row #
+**
 ** - cnt is an atomic counter keeping track of the number of used slots.
 **   it is used in the first slot only; subsequent slots replace it with
 **   4 padding bytes
 ** - i encodes either the 21-bit input value (round 0) or a reference to two
 **   inputs from the previous round
-**
-** If the first byte of Xi is 0xAB then:
-** - on even rounds, 'A' is part of the colliding PREFIX, 'B' is part of Xi
-** - on odd rounds, 'A' is padding, 'B' is part of the colliding PREFIX
 **
 ** Formula for Xi length and pad length above:
 ** > for i in range(9):
@@ -402,7 +403,12 @@ void kernel_round0(__global ulong *blake_state, __global char *ht,
 #endif
 
 /*
-** XOR a pair of Xi values and store them in the hash table.
+** XOR a pair of Xi values computed at "round - 1" and store the result in the
+** hash table being built for "round". Note that when building the table for
+** even rounds we need to skip 1 padding byte present in the "round - 1" table
+** (the "0xAB" byte mentioned in the description at the top of this file.) But
+** also note we can't load data directly past this byte because this would
+** cause an unaligned memory access which is undefined per the OpenCL spec.
 **
 ** Return 0 if successfully stored, or 1 if the row overflowed.
 */
@@ -415,11 +421,17 @@ uint xor_and_store(uint round, __global char *ht_dst, uint row,
     // storing the byte containing bits from the previous PREFIX block for
     if (round == 1 || round == 2)
       {
-	// Note: round N xors bytes from round N-1
 	// xor 24 bytes
 	xi0 = *(a++) ^ *(b++);
 	xi1 = *(a++) ^ *(b++);
 	xi2 = *a ^ *b;
+	if (round == 2)
+	  {
+	    // skip padding byte
+	    xi0 = (xi0 >> 8) | (xi1 << (64 - 8));
+	    xi1 = (xi1 >> 8) | (xi2 << (64 - 8));
+	    xi2 = (xi2 >> 8);
+	  }
       }
     else if (round == 3)
       {
@@ -434,6 +446,12 @@ uint xor_and_store(uint round, __global char *ht_dst, uint row,
 	xi0 = *a++ ^ *b++;
 	xi1 = *a ^ *b;
 	xi2 = 0;
+	if (round == 4)
+	  {
+	    // skip padding byte
+	    xi0 = (xi0 >> 8) | (xi1 << (64 - 8));
+	    xi1 = (xi1 >> 8);
+	  }
       }
     else if (round == 6)
       {
@@ -441,6 +459,12 @@ uint xor_and_store(uint round, __global char *ht_dst, uint row,
 	xi0 = *a++ ^ *b++;
 	xi1 = *(__global uint *)a ^ *(__global uint *)b;
 	xi2 = 0;
+	if (round == 6)
+	  {
+	    // skip padding byte
+	    xi0 = (xi0 >> 8) | (xi1 << (64 - 8));
+	    xi1 = (xi1 >> 8);
+	  }
       }
     else if (round == 7 || round == 8)
       {
@@ -448,6 +472,11 @@ uint xor_and_store(uint round, __global char *ht_dst, uint row,
 	xi0 = *a ^ *b;
 	xi1 = 0;
 	xi2 = 0;
+	if (round == 8)
+	  {
+	    // skip padding byte
+	    xi0 = (xi0 >> 8);
+	  }
       }
     // invalid solutions (which start happenning in round 5) have duplicate
     // inputs and xor to zero, so discard them
@@ -522,8 +551,6 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
 #error "unsupported NR_SLOTS"
 #endif
               }
-    // drop the entire 0xAB byte (see description at top of this file)
-    uint adj = (!(round % 2)) ? 1 : 0;
     // XOR colliding pairs of Xi
     dropped_stor = 0;
     for (n = 0; n < nr_coll; n++)
@@ -531,11 +558,9 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
         i = collisions[n] & 0xff;
         j = collisions[n] >> 8;
         a = (__global ulong *)
-            (ht_src + tid * NR_SLOTS * SLOT_LEN + i * SLOT_LEN + xi_offset
-	     + adj);
+            (ht_src + tid * NR_SLOTS * SLOT_LEN + i * SLOT_LEN + xi_offset);
         b = (__global ulong *)
-            (ht_src + tid * NR_SLOTS * SLOT_LEN + j * SLOT_LEN + xi_offset
-	     + adj);
+            (ht_src + tid * NR_SLOTS * SLOT_LEN + j * SLOT_LEN + xi_offset);
 	dropped_stor += xor_and_store(round, ht_dst, tid, i, j, a, b);
       }
     if (round < 8)
