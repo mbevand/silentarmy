@@ -222,7 +222,7 @@ void kernel_round0(__global ulong *blake_state, __global char *ht,
         // last block
         v[14] ^= -1;
 
-        // round 1 
+        // round 1
         mix(v[0], v[4], v[8],  v[12], 0, word1);
         mix(v[1], v[5], v[9],  v[13], 0, 0);
         mix(v[2], v[6], v[10], v[14], 0, 0);
@@ -231,7 +231,7 @@ void kernel_round0(__global ulong *blake_state, __global char *ht,
         mix(v[1], v[6], v[11], v[12], 0, 0);
         mix(v[2], v[7], v[8],  v[13], 0, 0);
         mix(v[3], v[4], v[9],  v[14], 0, 0);
-        // round 2 
+        // round 2
         mix(v[0], v[4], v[8],  v[12], 0, 0);
         mix(v[1], v[5], v[9],  v[13], 0, 0);
         mix(v[2], v[6], v[10], v[14], 0, 0);
@@ -240,7 +240,7 @@ void kernel_round0(__global ulong *blake_state, __global char *ht,
         mix(v[1], v[6], v[11], v[12], 0, 0);
         mix(v[2], v[7], v[8],  v[13], 0, 0);
         mix(v[3], v[4], v[9],  v[14], 0, 0);
-        // round 3 
+        // round 3
         mix(v[0], v[4], v[8],  v[12], 0, 0);
         mix(v[1], v[5], v[9],  v[13], 0, 0);
         mix(v[2], v[6], v[10], v[14], 0, 0);
@@ -249,7 +249,7 @@ void kernel_round0(__global ulong *blake_state, __global char *ht,
         mix(v[1], v[6], v[11], v[12], 0, 0);
         mix(v[2], v[7], v[8],  v[13], 0, word1);
         mix(v[3], v[4], v[9],  v[14], 0, 0);
-        // round 4 
+        // round 4
         mix(v[0], v[4], v[8],  v[12], 0, 0);
         mix(v[1], v[5], v[9],  v[13], 0, word1);
         mix(v[2], v[6], v[10], v[14], 0, 0);
@@ -258,7 +258,7 @@ void kernel_round0(__global ulong *blake_state, __global char *ht,
         mix(v[1], v[6], v[11], v[12], 0, 0);
         mix(v[2], v[7], v[8],  v[13], 0, 0);
         mix(v[3], v[4], v[9],  v[14], 0, 0);
-        // round 5 
+        // round 5
         mix(v[0], v[4], v[8],  v[12], 0, 0);
         mix(v[1], v[5], v[9],  v[13], 0, 0);
         mix(v[2], v[6], v[10], v[14], 0, 0);
@@ -267,7 +267,7 @@ void kernel_round0(__global ulong *blake_state, __global char *ht,
         mix(v[1], v[6], v[11], v[12], 0, 0);
         mix(v[2], v[7], v[8],  v[13], 0, 0);
         mix(v[3], v[4], v[9],  v[14], 0, 0);
-        // round 6 
+        // round 6
         mix(v[0], v[4], v[8],  v[12], 0, 0);
         mix(v[1], v[5], v[9],  v[13], 0, 0);
         mix(v[2], v[6], v[10], v[14], 0, 0);
@@ -276,7 +276,7 @@ void kernel_round0(__global ulong *blake_state, __global char *ht,
         mix(v[1], v[6], v[11], v[12], 0, 0);
         mix(v[2], v[7], v[8],  v[13], 0, 0);
         mix(v[3], v[4], v[9],  v[14], word1, 0);
-        // round 7 
+        // round 7
         mix(v[0], v[4], v[8],  v[12], 0, 0);
         mix(v[1], v[5], v[9],  v[13], word1, 0);
         mix(v[2], v[6], v[10], v[14], 0, 0);
@@ -285,7 +285,7 @@ void kernel_round0(__global ulong *blake_state, __global char *ht,
         mix(v[1], v[6], v[11], v[12], 0, 0);
         mix(v[2], v[7], v[8],  v[13], 0, 0);
         mix(v[3], v[4], v[9],  v[14], 0, 0);
-        // round 8 
+        // round 8
         mix(v[0], v[4], v[8],  v[12], 0, 0);
         mix(v[1], v[5], v[9],  v[13], 0, 0);
         mix(v[2], v[6], v[10], v[14], 0, word1);
@@ -294,7 +294,7 @@ void kernel_round0(__global ulong *blake_state, __global char *ht,
         mix(v[1], v[6], v[11], v[12], 0, 0);
         mix(v[2], v[7], v[8],  v[13], 0, 0);
         mix(v[3], v[4], v[9],  v[14], 0, 0);
-        // round 9 
+        // round 9
         mix(v[0], v[4], v[8],  v[12], 0, 0);
         mix(v[1], v[5], v[9],  v[13], 0, 0);
         mix(v[2], v[6], v[10], v[14], 0, 0);
@@ -303,7 +303,7 @@ void kernel_round0(__global ulong *blake_state, __global char *ht,
         mix(v[1], v[6], v[11], v[12], 0, 0);
         mix(v[2], v[7], v[8],  v[13], word1, 0);
         mix(v[3], v[4], v[9],  v[14], 0, 0);
-        // round 10 
+        // round 10
         mix(v[0], v[4], v[8],  v[12], 0, 0);
         mix(v[1], v[5], v[9],  v[13], 0, 0);
         mix(v[2], v[6], v[10], v[14], 0, 0);
@@ -312,7 +312,7 @@ void kernel_round0(__global ulong *blake_state, __global char *ht,
         mix(v[1], v[6], v[11], v[12], 0, 0);
         mix(v[2], v[7], v[8],  v[13], 0, 0);
         mix(v[3], v[4], v[9],  v[14], 0, 0);
-        // round 11 
+        // round 11
         mix(v[0], v[4], v[8],  v[12], 0, word1);
         mix(v[1], v[5], v[9],  v[13], 0, 0);
         mix(v[2], v[6], v[10], v[14], 0, 0);
@@ -321,7 +321,7 @@ void kernel_round0(__global ulong *blake_state, __global char *ht,
         mix(v[1], v[6], v[11], v[12], 0, 0);
         mix(v[2], v[7], v[8],  v[13], 0, 0);
         mix(v[3], v[4], v[9],  v[14], 0, 0);
-        // round 12 
+        // round 12
         mix(v[0], v[4], v[8],  v[12], 0, 0);
         mix(v[1], v[5], v[9],  v[13], 0, 0);
         mix(v[2], v[6], v[10], v[14], 0, 0);

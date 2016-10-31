@@ -149,7 +149,7 @@ char *s_hexdump(const void *_a, uint32_t a_len)
 }
 
 uint8_t hex2val(const char *base, size_t off)
-{   
+{
     const char          c = base[off];
     if (c >= '0' && c <= '9')           return c - '0';
     else if (c >= 'a' && c <= 'f')      return 10 + c - 'a';
@@ -460,7 +460,7 @@ void init_ht(cl_command_queue queue, cl_kernel k_init_ht, cl_mem buf_ht)
     cl_int      status;
 #if 0
     uint32_t    pat = -1;
-    status = clEnqueueFillBuffer(queue, buf_ht, &pat, sizeof (pat), 0, 
+    status = clEnqueueFillBuffer(queue, buf_ht, &pat, sizeof (pat), 0,
             NR_ROWS * NR_SLOTS * SLOT_LEN,
             0,		// cl_uint	num_events_in_wait_list
             NULL,	// cl_event	*event_wait_list
@@ -870,7 +870,7 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
 	fatal("clCreateProgramWithSource (%d)\n", status);
     /* Build program. */
     fprintf(stderr, "Building program\n");
-    status = clBuildProgram(program, 1, devices + gpu_to_use, 
+    status = clBuildProgram(program, 1, devices + gpu_to_use,
 	    "", // compile options
 	    NULL, NULL);
     if (status != CL_SUCCESS)
