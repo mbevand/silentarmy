@@ -573,7 +573,7 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
 }
 
 /*
-** This defines kernel_round1, kernel_round2, ..., kernel_round8.
+** This defines kernel_round1, kernel_round2, ..., kernel_round7.
 */
 #define KERNEL_ROUND(N) \
 __kernel __attribute__((reqd_work_group_size(64, 1, 1))) \
@@ -589,7 +589,17 @@ KERNEL_ROUND(4)
 KERNEL_ROUND(5)
 KERNEL_ROUND(6)
 KERNEL_ROUND(7)
-KERNEL_ROUND(8)
+
+// kernel_round8 takes an extra argument, "sols"
+__kernel __attribute__((reqd_work_group_size(64, 1, 1)))
+void kernel_round8(__global char *ht_src, __global char *ht_dst,
+	__global uint *debug, __global sols_t *sols)
+{
+    uint                tid = get_global_id(0);
+    equihash_round(8, ht_src, ht_dst, debug);
+    if (!tid)
+	sols->nr = sols->likely_invalids = 0;
+}
 
 uint expand_ref(__global char *ht, uint xi_offset, uint row, uint slot)
 {
@@ -669,9 +679,6 @@ void kernel_sols(__global char *ht0, __global char *ht1, __global sols_t *sols)
 #else
 #error "unsupported NR_ROWS_LOG"
 #endif
-    if (tid == 0)
-	sols->nr = sols->likely_invalids = 0;
-    mem_fence(CLK_GLOBAL_MEM_FENCE); // for tid 0 initializing struct above
     a = htabs[ht_i] + tid * NR_SLOTS * SLOT_LEN;
     cnt = *(__global uint *)a;
     cnt = min(cnt, (uint)NR_SLOTS); // handle possible overflow in last round

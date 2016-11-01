@@ -753,8 +753,9 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
 	    check_clSetKernelArg(k_rounds[round], 1, &buf_ht[round % 2]);
 	    global_ws = NR_ROWS;
 	  }
-
 	check_clSetKernelArg(k_rounds[round], 2, &buf_dbg);
+	if (round == PARAM_K - 1)
+	    check_clSetKernelArg(k_rounds[round], 3, &buf_sols);
 	check_clEnqueueNDRangeKernel(queue, k_rounds[round], 1, NULL,
 		&global_ws, &local_work_size, 0, NULL, NULL);
 	examine_ht(round, queue, buf_ht[round % 2]);
