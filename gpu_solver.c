@@ -335,9 +335,11 @@ unsigned int gpu_solver__find_sols(struct gpu_solver *self, uint8_t *header,
 
   uint64_t t1 = now();
   total = gpu_solver__extract_valid_solutions(self, sols, max_solutions);
+  uint64_t t2 = now();
 
-  fprintf(stderr, "Total %ld solutions in %.1f ms (%.1f Sol/s)\n",
-	  total, (t1 - t0) / 1e3, total / ((t1 - t0) / 1e6));
+  debug("Total %ld solutions in %.1f ms (%.1f Sol/s), solving time: %.1f ms, "
+	"extraction time: %.1f ms\n",
+	total, (t2 - t0) / 1e3, total / ((t2 - t0) / 1e6), (t1 - t0) / 1e3, (t2 - t1) / 1e3);
 
   return (unsigned int)total;
 }
