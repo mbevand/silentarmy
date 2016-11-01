@@ -108,12 +108,14 @@ void gpu_solver__encode_sol(uint32_t *sol, size_t count, uint8_t *encoded_sol)
 }
 
 
-int gpu_solver__init(struct gpu_solver *self, uint32_t gpu_to_use)
+int gpu_solver__init(struct gpu_solver *self, uint32_t gpu_to_use, bool verbose_)
 {
   int result = 0;
   cl_uint num_platforms;
   cl_uint nr_devs = 0;
 
+  /* Global setting to enable verbose mode of the library */
+  verbose = verbose_;
   cl_int status = clGetPlatformIDs(0, NULL, &num_platforms);
   if (status != CL_SUCCESS)
     fatal("Cannot get OpenCL platforms! (%d)\n", status);
@@ -220,11 +222,12 @@ int gpu_solver__init(struct gpu_solver *self, uint32_t gpu_to_use)
 }
 
 
-struct gpu_solver* gpu_solver__new(uint32_t gpu_to_use)
+struct gpu_solver* gpu_solver__new(uint32_t gpu_to_use, bool verbose_)
 {
   struct gpu_solver *self = malloc(sizeof(struct gpu_solver));
+
   if (self != NULL) {
-    gpu_solver__init(self, gpu_to_use);
+    gpu_solver__init(self, gpu_to_use, verbose_);
   }
 
   return self;

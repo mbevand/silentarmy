@@ -17,7 +17,7 @@ struct solution {
 
 struct gpu_solver;
 
-struct gpu_solver* gpu_solver__new(uint32_t gpu_to_use);
+struct gpu_solver* gpu_solver__new(uint32_t gpu_to_use, bool verbose);
 int gpu_solver__destroy(struct gpu_solver *self);
 
 unsigned int gpu_solver__find_sols(struct gpu_solver *self, uint8_t *header,
@@ -40,11 +40,11 @@ def load_library():
 class Solver(object):
     max_solutions = 16
 
-    def __init__(self):
+    def __init__(self, verbose=True):
         self.solver_ = self.header_ = self.solutions_ = self.solution_to_check_ = None
         self._ensure_library()
         assert library and ffi
-        self.solver_ = library.gpu_solver__new(0)
+        self.solver_ = library.gpu_solver__new(0, verbose)
         self.solutions_ = ffi.new('struct gpu_solver__encoded_solution[%s]' % self.max_solutions)
 
     def __del__(self):
