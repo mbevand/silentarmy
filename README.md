@@ -98,18 +98,11 @@ from 0 to 99):
 
 `$ make test`
 
-Note: one or two of the 196 expected solutions are sometimes missed due to a
-yet-to-be-fixed race when `NR_ROWS_LOG` is 20 (default). If it bothers you,
-edit `param.h` and define `NR_ROWS_LOG` to 19 but this will degrade performance
-by ~10%.
+For more testing run `silentarmy --nonces 10000`. It should finds 18681
+solutions which is less than 1% off the theoretical expected average number of
+solutions of 1.88 per Equihash run at (n,k)=(200,9).
 
-On the subject of correctness, `silentarmy --nonces 10000` finds 18665
-solutions (with `NR_ROWS_LOG` set to 19), so it is less than 1% off the
-theoretical expected average number of solutions of 1.88 per Equihash
-run at n,k=200,9.
-
-For installing, just copy `silentarmy` wherever. It has no dependencies;
-the OpenCL code is embedded in the binary.
+For installing, just copy `silentarmy` wherever.
 
 # Implementation details
 

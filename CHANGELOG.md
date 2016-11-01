@@ -2,6 +2,7 @@
 
 * Add support for multiple OpenCL platforms: --list-gpu now scans all available
   platforms, numbering devices using globally unique IDs.
+* Improve correctness: find ~0.09% more solutions
 
 # Version 2 (30 Oct 2016)
 

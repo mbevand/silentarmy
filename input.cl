@@ -504,8 +504,8 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
     uchar		mask;
     uint                i, j;
     // NR_SLOTS is already oversized (by a factor of OVERHEAD), but we want to
-    // make it twice larger
-    ushort		collisions[NR_SLOTS * 2];
+    // make it even larger
+    ushort		collisions[NR_SLOTS * 3];
     uint                nr_coll = 0;
     uint                n;
     uint                dropped_coll, dropped_stor;
