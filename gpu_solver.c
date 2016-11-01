@@ -59,6 +59,8 @@ struct gpu_solver {
   cl_mem buf_dbg;
   void  *dbg;
   size_t dbg_size;
+
+  sols_t *all_found_sols;
 };
 
 
@@ -209,6 +211,10 @@ int gpu_solver__init(struct gpu_solver *self, uint32_t gpu_to_use)
   self->buf_sols = check_clCreateBuffer(self->context, CL_MEM_READ_WRITE,
 					sizeof(sols_t),	NULL);
 
+  self->all_found_sols = (sols_t*)malloc(sizeof(sols_t));
+  if (!self->all_found_sols)
+    fatal("malloc: %s\n", strerror(errno));
+
  init_failed:
   return result;
 }
@@ -229,6 +235,8 @@ int gpu_solver__destroy(struct gpu_solver *self)
 {
   cl_int status;
   assert(CL_SUCCESS == 0);
+
+  free(self->all_found_sols);
 
   /* Clean up all buffers */
   if (self->dbg)
@@ -262,37 +270,33 @@ size_t gpu_solver__extract_valid_solutions(struct gpu_solver *self,
 					   unsigned int max_solutions)
 {
   uint32_t counted = 0;
-  sols_t *all_sols;
   uint32_t nr_valid_sols;
 
-  all_sols = (sols_t*)malloc(sizeof(sols_t));
-  if (!all_sols)
-    fatal("malloc: %s\n", strerror(errno));
   check_clEnqueueReadBuffer(self->queue, self->buf_sols,
 			    CL_TRUE,	// cl_bool	blocking_read
 			    0,		// size_t	offset
-			    sizeof (*all_sols),	// size_t	size
-			    all_sols,	// void		*ptr
+			    sizeof (*self->all_found_sols),	// size_t	size
+			    self->all_found_sols,	// void		*ptr
 			    0,		// cl_uint	num_events_in_wait_list
 			    NULL,	// cl_event	*event_wait_list
 			    NULL);	// cl_event	*event
-  if (all_sols->nr > MAX_SOLS) {
+  if (self->all_found_sols->nr > MAX_SOLS) {
     fprintf(stderr, "%d (probably invalid) solutions were dropped!\n",
-	    all_sols->nr - MAX_SOLS);
-    all_sols->nr = MAX_SOLS;
+	    self->all_found_sols->nr - MAX_SOLS);
+    self->all_found_sols->nr = MAX_SOLS;
   }
   nr_valid_sols = 0;
-  for (unsigned sol_i = 0; sol_i < all_sols->nr; sol_i++) {
-    nr_valid_sols += verify_sol(all_sols, sol_i);
+  for (unsigned sol_i = 0; sol_i < self->all_found_sols->nr; sol_i++) {
+    nr_valid_sols += verify_sol(self->all_found_sols, sol_i);
   }
   fprintf(stderr, "%d sol%s\n", nr_valid_sols, nr_valid_sols == 1 ? "" : "s");
-  debug("Stats: %d likely invalids\n", all_sols->likely_invalids);
+  debug("Stats: %d likely invalids\n", self->all_found_sols->likely_invalids);
 
-  for (uint32_t i = 0; i < all_sols->nr; i++) {
-    if (all_sols->valid[i]) {
+  for (uint32_t i = 0; i < self->all_found_sols->nr; i++) {
+    if (self->all_found_sols->valid[i]) {
       if (counted >= nr_valid_sols)
 	fatal("Bug: more than %d solutions\n", nr_valid_sols);
-      gpu_solver__encode_sol(all_sols->values[i], 1 << PARAM_K,
+      gpu_solver__encode_sol(self->all_found_sols->values[i], 1 << PARAM_K,
 			     sols[counted].bytes);
       counted++;
     }
@@ -301,7 +305,7 @@ size_t gpu_solver__extract_valid_solutions(struct gpu_solver *self,
       break;
     }
   }
-  free(all_sols);
+
   return nr_valid_sols;
 }
 
