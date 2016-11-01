@@ -243,16 +243,27 @@ void get_program_bins(cl_program program)
     debug("program: %02x%02x%02x%02x...\n", p[0], p[1], p[2], p[3]);
 }
 
+void print_platform_info(cl_platform_id plat)
+{
+    char	name[1024];
+    size_t	len = 0;
+    int		status;
+    status = clGetPlatformInfo(plat, CL_PLATFORM_NAME, sizeof (name), &name,
+	    &len);
+    if (status != CL_SUCCESS)
+	fatal("clGetPlatformInfo (%d)\n", status);
+    printf("Devices on platform \"%s\":\n", name);
+}
+
 void print_device_info(unsigned i, cl_device_id d)
 {
-    char	name[256];
+    char	name[1024];
     size_t	len = 0;
-    int r;
-    r = clGetDeviceInfo(d, CL_DEVICE_NAME, sizeof (name), &name,
-            &len);
-    if (r)
-	fatal("clGetDeviceInfo (%d)\n", r);
-    printf("ID %d: %s\n", i, name);
+    int		status;
+    status = clGetDeviceInfo(d, CL_DEVICE_NAME, sizeof (name), &name, &len);
+    if (status != CL_SUCCESS)
+	fatal("clGetDeviceInfo (%d)\n", status);
+    printf("  ID %d: %s\n", i, name);
 }
 
 #ifdef ENABLE_DEBUG
@@ -801,59 +812,114 @@ void run_opencl(uint8_t *header, size_t header_len, cl_context ctx,
     clReleaseMemObject(buf_ht[1]);
 }
 
-void list_gpu(cl_device_id *devices, cl_uint nr)
+/*
+** Scan the devices available on this platform. Try to find the device
+** selected by the "--use <id>" option and, if found, store the platform and
+** device in plat_id and dev_id.
+**
+** plat			platform being scanned
+** nr_devs_total	total number of devices detected so far, will be
+** 			incremented by the number of devices available on this
+** 			platform
+** plat_id		where to store the platform id
+** dev_id		where to store the device id
+**
+** Return 1 iff the selected device was found.
+*/
+unsigned scan_platform(cl_platform_id plat, cl_uint *nr_devs_total,
+	cl_platform_id *plat_id, cl_device_id *dev_id)
 {
-    (void)devices;
-    printf("Found %d GPU device%s\n", nr, (nr != 1) ? "s" : "");
-    for (uint32_t i = 0; i < nr; i++)
-	print_device_info(i, devices[i]);
+    cl_device_type	typ = CL_DEVICE_TYPE_GPU; // only look for GPUs
+    cl_uint		nr_devs = 0;
+    cl_device_id	*devices;
+    cl_int		status;
+    unsigned		found = 0;
+    unsigned		i;
+    if (do_list_gpu)
+	print_platform_info(plat);
+    status = clGetDeviceIDs(plat, typ, 0, NULL, &nr_devs);
+    if (status != CL_SUCCESS)
+	fatal("clGetDeviceIDs (%d)\n", status);
+    if (nr_devs == 0)
+	return 0;
+    devices = (cl_device_id *)malloc(nr_devs * sizeof (*devices));
+    status = clGetDeviceIDs(plat, typ, nr_devs, devices, NULL);
+    if (status != CL_SUCCESS)
+	fatal("clGetDeviceIDs (%d)\n", status);
+    i = 0;
+    while (i < nr_devs)
+      {
+	if (do_list_gpu)
+	    print_device_info(*nr_devs_total, devices[i]);
+	else if (*nr_devs_total == gpu_to_use)
+	  {
+	    found = 1;
+	    *plat_id = plat;
+	    *dev_id = devices[i];
+	    break ;
+	  }
+	(*nr_devs_total)++;
+	i++;
+      }
+    free(devices);
+    return found;
+}
+
+/*
+** Stores the platform id and device id that was selected by the "--use <id>"
+** option.
+**
+** plat_id		where to store the platform id
+** dev_id		where to store the device id
+*/
+void scan_platforms(cl_platform_id *plat_id, cl_device_id *dev_id)
+{
+    cl_uint		nr_platforms;
+    cl_platform_id	*platforms;
+    cl_uint		i, nr_devs_total;
+    cl_int		status;
+    status = clGetPlatformIDs(0, NULL, &nr_platforms);
+    if (status != CL_SUCCESS)
+	fatal("Cannot get OpenCL platforms (%d)\n", status);
+    if (!nr_platforms || verbose)
+	fprintf(stderr, "Found %d OpenCL platform(s)\n", nr_platforms);
+    if (!nr_platforms)
+	exit(1);
+    platforms = (cl_platform_id *)malloc(nr_platforms * sizeof (*platforms));
+    if (!platforms)
+	fatal("malloc: %s\n", strerror(errno));
+    status = clGetPlatformIDs(nr_platforms, platforms, NULL);
+    if (status != CL_SUCCESS)
+	fatal("clGetPlatformIDs (%d)\n", status);
+    i = nr_devs_total = 0;
+    while (i < nr_platforms)
+      {
+	if (scan_platform(platforms[i], &nr_devs_total, plat_id, dev_id))
+	    break ;
+	i++;
+      }
+    if (do_list_gpu)
+	exit(0);
+    debug("Using GPU device ID %d\n", gpu_to_use);
+    free(platforms);
 }
 
 void init_and_run_opencl(uint8_t *header, size_t header_len)
 {
-    cl_uint		numPlatforms;
-    cl_platform_id	platform = NULL;
-    cl_uint		nr_devs = 0;
-    cl_device_id	*devices;
-    cl_int		status = clGetPlatformIDs(0, NULL, &numPlatforms);
+    cl_platform_id	plat_id = 0;
+    cl_device_id	dev_id = 0;
     cl_kernel		k_rounds[PARAM_K];
-    if (status != CL_SUCCESS)
-	fatal("Cannot get OpenCL platforms! (%d)\n", status);
-    debug("Found %d OpenCL platform(s)\n", numPlatforms);
-    if (numPlatforms == 0)
-	exit(1);
-    cl_platform_id* platforms = (cl_platform_id *)
-        malloc(numPlatforms * sizeof (cl_platform_id));
-    status = clGetPlatformIDs(numPlatforms, platforms, NULL);
-    if (status != CL_SUCCESS)
-	fatal("clGetPlatformIDs (%d)\n", status);
-    platform = platforms[0]; // always select first platform
-    free(platforms);
-    // Query the platform and choose the first GPU device if has one
-    status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 0, NULL, &nr_devs);
-    if (status != CL_SUCCESS)
-	fatal("clGetDeviceIDs (%d)\n", status);
-    if (nr_devs == 0)
-	fatal("No GPU device available\n");
-    devices = (cl_device_id*)malloc(nr_devs * sizeof (*devices));
-    status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, nr_devs, devices,
-	    NULL);
-    if (status != CL_SUCCESS)
-	fatal("clGetDeviceIDs (%d)\n", status);
-    if (do_list_gpu)
-      {
-	list_gpu(devices, nr_devs);
-	return ;
-      }
+    cl_int		status;
+    scan_platforms(&plat_id, &dev_id);
+    if (!plat_id || !dev_id)
+	fatal("Selected GPU (ID %d) not found; see --list-gpu\n", gpu_to_use);
     /* Create context.*/
-    if (gpu_to_use >= nr_devs)
-	fatal("%d is an invalid GPU ID; see --list-gpu\n", gpu_to_use);
-    cl_context context = clCreateContext(NULL, 1, devices + gpu_to_use,
+    cl_context context = clCreateContext(NULL, 1, &dev_id,
 	    NULL, NULL, &status);
     if (status != CL_SUCCESS || !context)
 	fatal("clCreateContext (%d)\n", status);
     /* Creating command queue associate with the context.*/
-    cl_command_queue queue = clCreateCommandQueue(context, devices[gpu_to_use],
+    cl_command_queue queue = clCreateCommandQueue(context, dev_id,
 	    0, &status);
     if (status != CL_SUCCESS || !queue)
 	fatal("clCreateCommandQueue (%d)\n", status);
@@ -870,13 +936,13 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
 	fatal("clCreateProgramWithSource (%d)\n", status);
     /* Build program. */
     fprintf(stderr, "Building program\n");
-    status = clBuildProgram(program, 1, devices + gpu_to_use,
+    status = clBuildProgram(program, 1, &dev_id,
 	    "", // compile options
 	    NULL, NULL);
     if (status != CL_SUCCESS)
       {
         warn("OpenCL build failed (%d). Build log follows:\n", status);
-        get_program_build_log(program, devices[gpu_to_use]);
+        get_program_build_log(program, dev_id);
 	exit(1);
       }
     //get_program_bins(program);
@@ -908,8 +974,6 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
     status |= clReleaseContext(context);
     if (status)
 	fprintf(stderr, "Cleaning resources failed\n");
-    if (devices != NULL)
-	free(devices);
 }
 
 void print_header(uint8_t *h, size_t len)

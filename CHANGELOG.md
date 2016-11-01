@@ -1,3 +1,8 @@
+# Current
+
+* Add support for multiple OpenCL platforms: --list-gpu now scans all available
+  platforms, numbering devices using globally unique IDs.
+
 # Version 2 (30 Oct 2016)
 
 * Support GCN 1.0 / remove unaligned memory accesses (because of this bug,
