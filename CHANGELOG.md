@@ -1,5 +1,7 @@
 # Current
 
+* Reduce GPU memory usage to 671 MB (NR_ROWS_LOG=19) or 1208 MB
+  (NR_ROWS_LOG=20, default, ~10% faster than 19) per SILENTARMY instance
 * Add support for multiple OpenCL platforms: --list-gpu now scans all available
   platforms, numbering devices using globally unique IDs.
 * Improve correctness: find ~0.09% more solutions
