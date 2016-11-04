@@ -1,3 +1,7 @@
+# Current tip
+
+* Fix KeyError's when displaying stats
+
 # Version 3 (04 Nov 2016)
 
 * SILENTARMY is now a full miner, not just a solver; the solver binary was
@@ -8,7 +12,7 @@
   (NR_ROWS_LOG=20, default, ~10% faster than 19) per Equihash instance
 * Rename --list-gpu to --list and list all OpenCL devices (not just GPUs)
 * Add support for multiple OpenCL platforms: --list now scans all available
-  platforms, numbering devices using globally unique IDs.
+  platforms, numbering devices using globally unique IDs
 * Improve correctness: find ~0.09% more solutions
 
 # Version 2 (30 Oct 2016)
@@ -17,10 +21,10 @@
   previously SILENTARMY always reported 0 solutions on GCN 1.0 hardware)
 * Minor performance improvement (~1%)
 * Get rid of "kernel.cl" and move the OpenCL code to a C string embedded in the
-  binary during compilation.
+  binary during compilation
 * Update README with instructions for installing
   **Radeon Software Crimson Edition** (fglrx.ko) in addition to
-  **AMDGPU-PRO** (amdgpu.ko).
+  **AMDGPU-PRO** (amdgpu.ko)
 
 # Version 1 (27 Oct 2016)
 

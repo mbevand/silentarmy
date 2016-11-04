@@ -116,7 +116,10 @@ dependencies are an OpenCL implementation and the libsodium library.
 
 Installation of the drivers and SDK can be error-prone, so below are
 step-by-step instructions for the AMD OpenCL implementation (**AMD APP SDK**),
-for Ubuntu 16.04 as well as Ubuntu 14.04.
+for Ubuntu 16.04 as well as Ubuntu 14.04 (beware: the `silentarmy` miner makes
+use of Python's `ensure_future()` which requires Python 3.4.4, however Ubuntu
+14.04 ships 3.4.3, therefore only the `sa-solver` tool is usable on Ubuntu
+14.04.)
 
 ## Ubuntu 16.04
 
