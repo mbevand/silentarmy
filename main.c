@@ -1259,7 +1259,7 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
     const char *source;
     size_t source_len;
 #ifdef WIN32
-    load_file("../input.cl", &source, &source_len);
+    load_file("input.cl", &source, &source_len);
 #else
 	source = ocl_code;
 #endif
@@ -1272,7 +1272,7 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
     if (!mining || verbose)
 	fprintf(stderr, "Building program\n");
     status = clBuildProgram(program, 1, &dev_id,
-	    "-I ..", // compile options
+	    "-I .. -I .", // compile options
 	    NULL, NULL);
     if (status != CL_SUCCESS)
       {
