@@ -9,8 +9,15 @@ import struct
 import json
 import binascii
 import re
-import asyncio
 import logging
+
+# Python < 3.4.4 compatibility
+if sys.version_info.minor >= 4 and sys.version_info.micro >= 4:
+    import asyncio
+else:
+    LIBPATH = os.path.dirname(os.path.realpath(__file__)) + '/lib/asyncio'
+    sys.path.insert(0, LIBPATH)
+    import asyncio
 
 verbose_level = 0
 
