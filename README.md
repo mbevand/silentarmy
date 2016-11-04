@@ -10,11 +10,29 @@ currently supported due to an
 
 After compiling SILENTARMY, list the available OpenCL devices:
 
-`$ silentarmy --list`
+```
+$ silentarmy --list
+```
 
 Start mining with two GPUs (ID 2 and ID 5) on a pool:
 
-`$ silentarmy --use 2,5 -c stratum+tcp://us1-zcash.flypool.org:3333 -u t1cVviFvgJinQ4w3C2m2CfRxgP5DnHYaoFC`
+```
+$ silentarmy --use 2,5 -c stratum+tcp://us1-zcash.flypool.org:3333 -u t1cVviFvgJinQ4w3C2m2CfRxgP5DnHYaoFC
+```
+
+When run without options, SILENTARMY mines with the first OpenCL device, using
+my donation address, on flypool:
+
+```
+$ silentarmy
+Connecting to us1-zcash.flypool.org:3333
+Stratum server sent us the first job
+Mining on 2 devices
+Total 0.0 sol/s [dev0 0.0, dev1 0.0] 0 shares
+Total 77.9 sol/s [dev0 39.0, dev1 39.0] 0 shares
+Total 81.9 sol/s [dev0 41.5, dev1 40.5] 0 shares
+[...]
+```
 
 Usage:
 
@@ -47,7 +65,9 @@ the following command (this header is from
 [mainnet block #3400](https://explorer.zcha.in/blocks/00000001687e89e7e1ce48b349e601c89c70dd4c268fdf24b269a3ca4140426f)
 and should result in 1 Equihash solution):
 
-`$ sa-solver -i 04000000e54c27544050668f272ec3b460e1cde745c6b21239a81dae637fde4704000000844bc0c55696ef9920eeda11c1eb41b0c2e7324b46cc2e7aa0c2aa7736448d7a000000000000000000000000000000000000000000000000000000000000000068241a587e7e061d250e000000000000010000000000000000000000000000000000000000000000`
+```
+$ sa-solver -i 04000000e54c27544050668f272ec3b460e1cde745c6b21239a81dae637fde4704000000844bc0c55696ef9920eeda11c1eb41b0c2e7324b46cc2e7aa0c2aa7736448d7a000000000000000000000000000000000000000000000000000000000000000068241a587e7e061d250e000000000000010000000000000000000000000000000000000000000000
+```
 
 If the option `-i` is not specified, `sa-solver` solves a 140-byte header of all
 zero bytes. The option `--nonces <nr>` instructs the program to try multiple
