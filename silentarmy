@@ -485,6 +485,9 @@ class Silentarmy:
                     #   hashReserved, nTime, nBits, clean_jobs ]
                     self.set_new_job(*msg['params'][:8])
                     self.update_mining_job()
+                elif msg['method'] == 'client.reconnect':
+                    print("Get reconnect command from pool. Try reconnect...")
+                    asyncio.ensure_future(self.reconnect())
                 else:
                     raise Exception('Unimplemented method: %s' % msg['method'])
             else:
