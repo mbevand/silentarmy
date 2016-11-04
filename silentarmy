@@ -190,7 +190,11 @@ class Silentarmy:
             devids = last_sols[0].keys()
             sols = {}
             for devid in devids:
-                sols[devid] = last_sols[0][devid] - last_sols[idx][devid]
+                try:
+                    sols[devid] = last_sols[0][devid] - last_sols[idx][devid]
+                except KeyError as e:
+                    # XXX - ugly fix need to look into why stats are missing
+                    sols[devid] = 0
             sec = last_times[0] - last_times[idx]
             # sols contains per-devid data:
             #   { '0.0':10, '0.1':10, '1.0':100, '1.1':100 }
