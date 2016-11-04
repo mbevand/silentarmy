@@ -253,7 +253,12 @@ class Silentarmy:
         if self.opts.do_list:
             self.list_devices()
         self.init()
-        asyncio.ensure_future(self.reconnect())
+        try:
+            asyncio.ensure_future(self.reconnect())
+        except AttributeError as e:
+            fatal(('Error calling ensure_future(): %s\n' % e) +
+                    'Please update to Python 3.4.5 (or above) - see ' +
+                    'https://github.com/mbevand/silentarmy/issues/8')
         asyncio.ensure_future(self.show_stats())
         for gpuid in self.opts.use:
             for instid in range(self.opts.instances):
