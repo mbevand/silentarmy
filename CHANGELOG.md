@@ -1,6 +1,8 @@
 # Current tip
 
+* Only apply set_target to *next* mining job
 * Fix KeyError's when displaying stats
+* Be more robust about different types of network errors during connection
 
 # Version 3 (04 Nov 2016)
 

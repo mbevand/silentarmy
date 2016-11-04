@@ -393,8 +393,13 @@ class Silentarmy:
         verbose('Received target %s' % t)
         if not re.match(r'^[0-9a-fA-F]{64}$', t):
             raise Exception('Invalid target: %s' % t)
+        is_first_target = self.target is None
         # store it in internal byte order
         self.target = bytes.fromhex(t)[::-1]
+        # take the target into account *immediately* only if it is the first
+        # ever received, or else the target applies to the next job
+        if is_first_target:
+            self.update_mining_job()
 
     def set_new_job(self, job_id, nversion, hash_prev_block, hash_merkle_root,
             hash_reserved, ntime, nbits, clean_jobs):
@@ -476,7 +481,6 @@ class Silentarmy:
                 if msg['method'] == 'mining.set_target':
                     # params: [ target ]
                     self.set_target(msg['params'][0])
-                    self.update_mining_job()
                 elif msg['method'] == 'mining.notify':
                     # params: [ job_id, nVersion, hashPrevBlock, hashMerkleRoot,
                     #   hashReserved, nTime, nBits, clean_jobs ]
