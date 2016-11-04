@@ -395,9 +395,6 @@ class Silentarmy:
             raise Exception('Invalid target: %s' % t)
         # store it in internal byte order
         self.target = bytes.fromhex(t)[::-1]
-        l = len(self.target)
-        if l != 32:
-            fatal('Stratum: server returned an invalid %d-byte target' % l)
 
     def set_new_job(self, job_id, nversion, hash_prev_block, hash_merkle_root,
             hash_reserved, ntime, nbits, clean_jobs):
