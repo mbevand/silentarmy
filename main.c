@@ -128,8 +128,9 @@ void set_blocking_mode(int fd, int block)
     if (-1 == fcntl(fd, F_SETFL, block ? (f & ~O_NONBLOCK) : (f | O_NONBLOCK)))
 		fatal("fcntl F_SETFL: %s\n", strerror(errno));
 #else
-	if (0 != ioctlsocket(fd, FIONBIO, &block))
-		fatal("ioctlsocket: %s\n", strerror(errno));
+	ulong mode = block ? 0UL : 1UL;
+	if (0 != ioctlsocket(fd, FIONBIO, &mode))
+		fatal("ioctlsocket error: %d\n", WSAGetLastError());
 #endif
 	
 
@@ -218,7 +219,7 @@ uint8_t hex2val(const char *base, size_t off)
     if (c >= '0' && c <= '9')           return c - '0';
     else if (c >= 'a' && c <= 'f')      return 10 + c - 'a';
     else if (c >= 'A' && c <= 'F')      return 10 + c - 'A';
-    fatal("Invalid hex char at offset %zd: ...%c...\n", off, c);
+    fatal("Invalid hex char at offset %d: ...%d...\n", off, c);
     return 0;
 }
 
@@ -957,30 +958,45 @@ int read_last_line(char *buf, size_t len, int block)
     char	*start;
     size_t	pos = 0;
     ssize_t	n;
+#ifndef WIN32
     set_blocking_mode(0, block);
-    while (42)
+#else
+	int c;
+#endif
+	while (42)
       {
-	n = read(0, buf + pos, len - pos);
-	if (n == -1 && errno == EINTR)
-	    continue ;
-	else if (n == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
-	  {
-	    if (!pos)
-		return 0;
-	    warn("strange: a partial line was read\n");
-	    // a partial line was read, continue reading it in blocking mode
-	    // to be sure to read it completely
-	    set_blocking_mode(0, 1);
-	    continue ;
-	  }
-	else if (n == -1)
-	    fatal("read stdin: %s\n", strerror(errno));
-	else if (!n)
-	    fatal("EOF on stdin\n");
-	pos += n;
-	if (buf[pos - 1] == '\n')
-	    // 1 (or more) complete lines were read
-	    break ;
+#ifndef WIN32
+		n = read(0, buf + pos, len - pos);
+		if (n == -1 && errno == EINTR)
+			continue ;
+		else if (n == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
+			{
+			if (!pos)
+			return 0;
+			warn("strange: a partial line was read\n");
+			// a partial line was read, continue reading it in blocking mode
+			// to be sure to read it completely
+			set_blocking_mode(0, 1);
+			continue ;
+			}
+		else if (n == -1)
+			fatal("read stdin: %s\n", strerror(errno));
+		else if (!n)
+			fatal("EOF on stdin\n");
+		pos += n;
+
+		if (buf[pos - 1] == '\n')
+			// 1 (or more) complete lines were read
+			break;
+#else
+		  c = fgetc(stdin);
+		 
+		  if (c == EOF)
+			  break;
+		  if ((*buf++ = c) == '\n')
+			  break;
+		  pos++;
+#endif
       }
     start = memrchr(buf, '\n', pos - 1);
     if (start)
@@ -991,6 +1007,8 @@ int read_last_line(char *buf, size_t len, int block)
 	memmove(buf, start + 1, pos);
       }
     // overwrite '\n' with NUL
+
+	printf("%s", buf);
     buf[pos - 1] = 0;
     return 1;
 }
@@ -1021,6 +1039,7 @@ void mining_parse_job(char *str, uint8_t *target, size_t target_len,
 	char *job_id, size_t job_id_len, uint8_t *header, size_t header_len,
 	size_t *fixed_nonce_bytes)
 {
+	//printf("%s", str);
     uint32_t		str_i, i;
     // parse target
     str_i = 0;
@@ -1075,6 +1094,24 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
     uint64_t		status_period = 500e3; // time (usec) between statuses
     puts("SILENTARMY mining mode ready");
     fflush(stdout);
+
+#ifdef WIN32
+	WORD wVersionRequested;
+	WSADATA wsaData;
+	int err;
+
+	/* Use the MAKEWORD(lowbyte, highbyte) macro declared in Windef.h */
+	wVersionRequested = MAKEWORD(2, 2);
+
+	err = WSAStartup(wVersionRequested, &wsaData);
+	if (err != 0) {
+		/* Tell the user that we could not find a usable */
+		/* Winsock DLL.                                  */
+		printf("WSAStartup failed with error: %d\n", err);
+		fflush(stdout);
+	}
+#endif
+
     for (i = 0; ; i++)
       {
         // iteration #0 always reads a job or else there is nothing to do
@@ -1445,12 +1482,13 @@ int main(int argc, char **argv)
 		gpu_to_use = parse_num(optarg);
 		break ;
 	    case OPT_MINING:
-		mining = 1;
+
 		break ;
             default:
                 fatal("Try '%s --help'\n", argv[0]);
                 break ;
           }
+	mining = 1;
     tests();
     header_len = parse_header(header, sizeof (header), hex_header);
     init_and_run_opencl(header, header_len);
