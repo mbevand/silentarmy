@@ -27,10 +27,11 @@ my donation address, on flypool:
 $ silentarmy
 Connecting to us1-zcash.flypool.org:3333
 Stratum server sent us the first job
-Mining on 2 devices
-Total 0.0 sol/s [dev0 0.0, dev1 0.0] 0 shares
-Total 77.9 sol/s [dev0 39.0, dev1 39.0] 0 shares
-Total 81.9 sol/s [dev0 41.5, dev1 40.5] 0 shares
+Mining on 1 device
+Total 0.0 sol/s [dev0 0.0] 0 shares
+Total 43.9 sol/s [dev0 43.9] 0 shares
+Total 46.9 sol/s [dev0 46.9] 0 shares
+Total 44.9 sol/s [dev0 44.9] 1 share
 [...]
 ```
 
