@@ -176,7 +176,7 @@ class Silentarmy:
                 self.host, self.port)
         try:
             yield from coro
-        except socket.gaierror as e:
+        except Exception as e:
             print("Stratum: error connecting: %s" % e)
             asyncio.ensure_future(self.reconnect())
 
