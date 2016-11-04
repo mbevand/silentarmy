@@ -88,6 +88,7 @@ and statistics in progressively more and more details.
 # Performance
 
 * 47.5 Sol/s with one R9 Nano
+* 45.0 Sol/s with one R9 290X
 * 41.0 Sol/s with one RX 480 8GB
 
 Note: the `silentarmy` **miner** automatically achieves this performance level,
