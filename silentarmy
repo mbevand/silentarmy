@@ -214,6 +214,9 @@ class Silentarmy:
             if not self.st_had_job:
                 # do not show stats until we start working on a job
                 continue
+            if not self.total_sols:
+                # do not show stats if we don't have any
+                continue
             last_sols.insert(0, self.total_sols.copy())
             last_times.insert(0, time.time())
             sols = sum(last_sols[0].values()) - sum(last_sols[-1].values())
