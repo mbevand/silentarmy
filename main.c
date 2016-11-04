@@ -6,16 +6,46 @@
 #include <stdint.h>
 #include <assert.h>
 #include <sys/types.h>
-#include <sys/time.h>
-#include <sys/stat.h>
 #include <fcntl.h>
-#include <unistd.h>
-#include <getopt.h>
+#include <sys/stat.h>
+
+
 #include <errno.h>
-#include <sodium.h>
+
 #include <CL/cl.h>
 #include "blake.h"
+
+#ifdef WIN32
+
+#undef _UNICODE // @mrb quick patch to make win getopt work
+
+#include <Winsock2.h>
+#include <io.h>
+#include <BaseTsd.h>
+#include "silentarmy_win/gettimeofday.h"
+#include "silentarmy_win/getopt.h"
+#include "silentarmy_win/memrchr.h"
+
+typedef SSIZE_T ssize_t;
+
+#define SODIUM_STATIC
+
+#define open _open
+#define read _read
+#define write _write
+#define close _close
+#define snprintf _snprintf
+
+#else
+
+#include <sys/time.h>
+#include <unistd.h>
+#include <getopt.h>
 #include "_kernel.h"
+#endif
+
+#include <sodium.h>
+
 
 typedef uint8_t		uchar;
 typedef uint32_t	uint;
@@ -91,11 +121,18 @@ void show_time(uint64_t t0)
 
 void set_blocking_mode(int fd, int block)
 {
-    int		f;
+#ifndef WIN32
+	int		f;
     if (-1 == (f = fcntl(fd, F_GETFL)))
 	fatal("fcntl F_GETFL: %s\n", strerror(errno));
     if (-1 == fcntl(fd, F_SETFL, block ? (f & ~O_NONBLOCK) : (f | O_NONBLOCK)))
-	fatal("fcntl F_SETFL: %s\n", strerror(errno));
+		fatal("fcntl F_SETFL: %s\n", strerror(errno));
+#else
+	if (0 != ioctlsocket(fd, FIONBIO, &block))
+		fatal("ioctlsocket: %s\n", strerror(errno));
+#endif
+	
+
 }
 
 void randomize(void *p, ssize_t l)
@@ -740,15 +777,19 @@ void sort_pair(uint32_t *a, uint32_t len)
 ** If solution is invalid return 0. If solution is valid, sort the inputs
 ** and return 1.
 */
+
+#define SEEN_LEN (1 << (PREFIX + 1)) / 8
+
 uint32_t verify_sol(sols_t *sols, unsigned sol_i)
 {
     uint32_t	*inputs = sols->values[sol_i];
-    uint32_t	seen_len = (1 << (PREFIX + 1)) / 8;
-    uint8_t	seen[seen_len];
+    //uint32_t	seen_len = (1 << (PREFIX + 1)) / 8; 
+	//uint8_t	seen[seen_len]; // @mrb MSVC didn't like this.
+	uint8_t	seen[SEEN_LEN]; 
     uint32_t	i;
     uint8_t	tmp;
     // look for duplicate inputs
-    memset(seen, 0, seen_len);
+	memset(seen, 0, SEEN_LEN);
     for (i = 0; i < (1 << PARAM_K); i++)
       {
 	tmp = seen[inputs[i] / 8];
@@ -1217,9 +1258,12 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
     cl_program program;
     const char *source;
     size_t source_len;
-    //load_file("kernel.cl", &source, &source_len);
-    source = ocl_code;
-    source_len = strlen(ocl_code);
+#ifdef WIN32
+    load_file("../input.cl", &source, &source_len);
+#else
+	source = ocl_code;
+#endif
+	source_len = strlen(source);
     program = clCreateProgramWithSource(context, 1, (const char **)&source,
 	    &source_len, &status);
     if (status != CL_SUCCESS || !program)
@@ -1228,7 +1272,7 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
     if (!mining || verbose)
 	fprintf(stderr, "Building program\n");
     status = clBuildProgram(program, 1, &dev_id,
-	    "", // compile options
+	    "-I ..", // compile options
 	    NULL, NULL);
     if (status != CL_SUCCESS)
       {
@@ -1277,7 +1321,7 @@ uint32_t parse_header(uint8_t *h, size_t h_len, const char *hex)
     if (!hex)
       {
 	if (!do_list_devices && !mining)
-	    fprintf(stderr, "Solving default all-zero %zd-byte header\n", opt0);
+	    fprintf(stderr, "Solving default all-zero %d-byte header\n", opt0);
 	return opt1;
       }
     hex_len = strlen(hex);
@@ -1377,12 +1421,12 @@ int main(int argc, char **argv)
                 verbose += 1;
                 break ;
             case OPT_INPUTHEADER:
-		hex_header = optarg;
-		show_encoded = 1;
-                break ;
-	    case OPT_NONCES:
-		nr_nonces = parse_num(optarg);
-		break ;
+				hex_header = optarg;
+				show_encoded = 1;
+						break ;
+				case OPT_NONCES:
+				nr_nonces = parse_num(optarg);
+				break ;
             case OPT_THREADS:
                 // ignored, this is just to conform to the contest CLI API
                 break ;
