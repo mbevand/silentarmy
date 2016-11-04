@@ -26,7 +26,7 @@
 #elif NR_ROWS_LOG == 19
 #define OVERHEAD                        5
 #elif NR_ROWS_LOG == 20
-#define OVERHEAD                        9
+#define OVERHEAD                        6
 #endif
 
 #define NR_ROWS                         (1 << NR_ROWS_LOG)
