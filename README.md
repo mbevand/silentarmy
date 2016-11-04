@@ -158,6 +158,10 @@ use of Python's `ensure_future()` which requires Python 3.4.4, however Ubuntu
 
 2. Follow steps 5-9 above.
 
+## Arch Linux
+
+1. Install the [silentarmy AUR package](https://aur.archlinux.org/packages/silentarmy/).
+
 # Compilation and installation
 
 Compiling SILENTARMY is easy:
