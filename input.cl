@@ -502,12 +502,7 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
     uint                cnt;
     uchar		first_words[NR_SLOTS];
     uchar		mask;
-    uint                i, j;
-    // NR_SLOTS is already oversized (by a factor of OVERHEAD), but we want to
-    // make it even larger
-    ushort		collisions[NR_SLOTS * 3];
-    uint                nr_coll = 0;
-    uint                n;
+    uint                i, j, n;
     uint                dropped_coll, dropped_stor;
     __global ulong      *a, *b;
     uint		xi_offset;
@@ -532,31 +527,11 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
     for (i = 0; i < cnt; i++, p += SLOT_LEN)
         first_words[i] = *(__global uchar *)p;
     // find collisions
-    nr_coll = 0;
-    dropped_coll = 0;
+    dropped_stor = 0;
     for (i = 0; i < cnt; i++)
         for (j = i + 1; j < cnt; j++)
-            if ((first_words[i] & mask) ==
-		    (first_words[j] & mask))
-              {
-                // collision!
-                if (nr_coll >= sizeof (collisions) / sizeof (*collisions))
-                    dropped_coll++;
-                else
-#if NR_SLOTS <= (1 << 8)
-                    // note: this assumes slots can be encoded in 8 bits
-                    collisions[nr_coll++] =
-			((ushort)j << 8) | ((ushort)i & 0xff);
-#else
-#error "unsupported NR_SLOTS"
-#endif
-              }
-    // XOR colliding pairs of Xi
-    dropped_stor = 0;
-    for (n = 0; n < nr_coll; n++)
+        // XOR colliding pairs of Xi
       {
-        i = collisions[n] & 0xff;
-        j = collisions[n] >> 8;
         a = (__global ulong *)
             (ht_src + tid * NR_SLOTS * SLOT_LEN + i * SLOT_LEN + xi_offset);
         b = (__global ulong *)
