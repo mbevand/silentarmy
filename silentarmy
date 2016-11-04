@@ -7,11 +7,17 @@ import time
 import socket
 import struct
 import json
+import binascii
 import re
 import asyncio
 import logging
 
 verbose_level = 0
+
+def b2hex(b):
+    '''Convert a bytes object to a hex string.'''
+    # This is equivalent to bytes.hex() in Python 3.5.
+    return binascii.hexlify(b).decode('ascii')
 
 def warn(msg):
     sys.stderr.write(msg + '\n')
@@ -371,9 +377,9 @@ class Silentarmy:
             l = len(self.opts.use)
             print('Mining on %d device%s' % (l, '' if l == 1 else 's'))
             self.st_had_job = True
-        job = "%s %s %s %s\n" % (bytes.hex(self.target), self.job_id,
-                bytes.hex(self.zcash_nonceless_header),
-                bytes.hex(self.nonce_leftpart))
+        job = "%s %s %s %s\n" % (b2hex(self.target), self.job_id,
+                b2hex(self.zcash_nonceless_header),
+                b2hex(self.nonce_leftpart))
         very_verbose('To solvers: %s' % job.rstrip())
         for devid in self.solver_procs:
             self.solver_procs[devid].stdin.write(job.encode('ascii'))

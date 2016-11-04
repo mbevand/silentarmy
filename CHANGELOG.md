@@ -4,6 +4,7 @@
 * Do not abandon previous mining jobs if clean_jobs is false
 * Fix KeyError's when displaying stats
 * Be more robust about different types of network errors during connection
+* Remove bytes.hex() which was only supported on Python 3.5+.
 
 # Version 3 (04 Nov 2016)
 
