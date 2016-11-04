@@ -1,8 +1,13 @@
-# Current
+# Version 3 (04 Nov 2016)
 
+* SILENTARMY is now a full miner, not just a solver; the solver binary was
+  renamed "sa-solver" and the miner is the script "silentarmy"
+* Multi-GPU support
+* Stratum support for pool mining
 * Reduce GPU memory usage to 671 MB (NR_ROWS_LOG=19) or 1208 MB
-  (NR_ROWS_LOG=20, default, ~10% faster than 19) per SILENTARMY instance
-* Add support for multiple OpenCL platforms: --list-gpu now scans all available
+  (NR_ROWS_LOG=20, default, ~10% faster than 19) per Equihash instance
+* Rename --list-gpu to --list and list all OpenCL devices (not just GPUs)
+* Add support for multiple OpenCL platforms: --list now scans all available
   platforms, numbering devices using globally unique IDs.
 * Improve correctness: find ~0.09% more solutions
 

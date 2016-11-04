@@ -1,36 +1,37 @@
 # Change this path if the SDK was installed in a non-standard location
-AMDAPPSDK = "/opt/AMDAPPSDK-3.0/include"
-# Change this path if your libOpenCL.so library is located elsewhere
-LIBOPENCL = "/opt/amdgpu-pro/lib/x86_64-linux-gnu/libOpenCL.so"
+OPENCL_HEADERS = "/opt/AMDAPPSDK-3.0/include"
+# By default libOpenCL.so is searched in default system locations, this path
+# lets you adds one more directory to the search path.
+LIBOPENCL = "/opt/amdgpu-pro/lib/x86_64-linux-gnu"
 
 CC = gcc
 CPPFLAGS = -std=gnu99 -pedantic -Wextra -Wall -ggdb \
     -Wno-deprecated-declarations \
     -Wno-overlength-strings \
-    -I${AMDAPPSDK}
-LDFLAGS = -rdynamic
-LDLIBS = ${LIBOPENCL}
+    -I${OPENCL_HEADERS}
+LDFLAGS = -rdynamic -L${LIBOPENCL}
+LDLIBS = -lOpenCL -lsodium
 OBJ = main.o blake.o
 INCLUDES = blake.h param.h _kernel.h
 
-all : silentarmy
+all : sa-solver
 
-silentarmy : ${OBJ}
-	${CC} -o silentarmy ${OBJ} ${LDFLAGS} ${LDLIBS}
+sa-solver : ${OBJ}
+	${CC} -o sa-solver ${OBJ} ${LDFLAGS} ${LDLIBS}
 
 ${OBJ} : ${INCLUDES}
 
-_kernel.h: input.cl param.h
+_kernel.h : input.cl param.h
 	echo 'const char *ocl_code = R"_mrb_(' >$@
 	cpp $< >>$@
 	echo ')_mrb_";' >>$@
 
-test: silentarmy
-	./silentarmy --nonces 100 -v -v 2>&1 | grep Soln: | \
-	    diff -u sols-100 - | cut -c 1-75
+test : sa-solver
+	./sa-solver --nonces 100 -v -v 2>&1 | grep Soln: | \
+	    diff -u testing/sols-100 - | cut -c 1-75
 
 clean :
-	rm -f silentarmy _kernel.h *.o _temp_*
+	rm -f sa-solver _kernel.h *.o _temp_*
 
 re : clean all
 

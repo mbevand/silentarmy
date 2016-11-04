@@ -35,9 +35,20 @@
 #define SLOT_LEN                        32
 // Total size of hash table
 #define HT_SIZE				(NR_ROWS * NR_SLOTS * SLOT_LEN)
-// Length of Zcash block header and nonce
+// Length of Zcash block header, nonce (part of header)
 #define ZCASH_BLOCK_HEADER_LEN		140
+// Offset of nTime in header
+#define ZCASH_BLOCK_OFFSET_NTIME        (4 + 3 * 32)
+// Length of nonce
 #define ZCASH_NONCE_LEN			32
+// Length of encoded representation of solution size
+#define ZCASH_SOLSIZE_LEN		3
+// Solution size (1344 = 0x540) represented as a compact integer, in hex
+#define ZCASH_SOLSIZE_HEX               "fd4005"
+// Length of encoded solution (512 * 21 bits / 8 = 1344 bytes)
+#define ZCASH_SOL_LEN                   ((1 << PARAM_K) * (PREFIX + 1) / 8)
+// Last N_ZERO_BYTES of nonce must be zero due to my BLAKE2B optimization
+#define N_ZERO_BYTES			12
 // Number of bytes Zcash needs out of Blake
 #define ZCASH_HASH_LEN                  50
 // Number of wavefronts per SIMD for the Blake kernel.
@@ -45,7 +56,10 @@
 // at least 2 wavefronts per SIMD to hide the 2-clock latency of integer
 // instructions. 10 is the max supported by the hw.
 #define BLAKE_WPS               	10
+// Maximum number of solutions reported by kernel to host
 #define MAX_SOLS			2000
+// Length of SHA256 target
+#define SHA256_TARGET_LEN               (256 / 8)
 
 // Optional features
 #undef ENABLE_DEBUG

@@ -1,3 +1,4 @@
+#define _GNU_SOURCE	1/* memrchr */
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -11,6 +12,7 @@
 #include <unistd.h>
 #include <getopt.h>
 #include <errno.h>
+#include <sodium.h>
 #include <CL/cl.h>
 #include "blake.h"
 #include "_kernel.h"
@@ -26,8 +28,9 @@ typedef uint64_t	ulong;
 int             verbose = 0;
 uint32_t	show_encoded = 0;
 uint64_t	nr_nonces = 1;
-uint32_t	do_list_gpu = 0;
+uint32_t	do_list_devices = 0;
 uint32_t	gpu_to_use = 0;
+uint32_t	mining = 0;
 
 typedef struct  debug_s
 {
@@ -86,6 +89,30 @@ void show_time(uint64_t t0)
     fprintf(stderr, "Elapsed time: %.1f msec\n", (t1 - t0) / 1e3);
 }
 
+void set_blocking_mode(int fd, int block)
+{
+    int		f;
+    if (-1 == (f = fcntl(fd, F_GETFL)))
+	fatal("fcntl F_GETFL: %s\n", strerror(errno));
+    if (-1 == fcntl(fd, F_SETFL, block ? (f & ~O_NONBLOCK) : (f | O_NONBLOCK)))
+	fatal("fcntl F_SETFL: %s\n", strerror(errno));
+}
+
+void randomize(void *p, ssize_t l)
+{
+    const char	*fname = "/dev/urandom";
+    int		fd;
+    ssize_t	ret;
+    if (-1 == (fd = open(fname, O_RDONLY)))
+	fatal("open %s: %s\n", fname, strerror(errno));
+    if (-1 == (ret = read(fd, p, l)))
+	fatal("read %s: %s\n", fname, strerror(errno));
+    if (ret != l)
+	fatal("%s: short read %d bytes out of %d\n", fname, ret, l);
+    if (-1 == close(fd))
+	fatal("close %s: %s\n", fname, strerror(errno));
+}
+
 cl_mem check_clCreateBuffer(cl_context ctx, cl_mem_flags flags, size_t size,
 	void *host_ptr)
 {
@@ -140,7 +167,7 @@ void hexdump(uint8_t *a, uint32_t a_len)
 char *s_hexdump(const void *_a, uint32_t a_len)
 {
     const uint8_t	*a = _a;
-    static char		buf[1024];
+    static char		buf[4096];
     uint32_t		i;
     for (i = 0; i < a_len && i + 2 < sizeof (buf); i++)
         sprintf(buf + i * 2, "%02x", a[i]);
@@ -253,6 +280,7 @@ void print_platform_info(cl_platform_id plat)
     if (status != CL_SUCCESS)
 	fatal("clGetPlatformInfo (%d)\n", status);
     printf("Devices on platform \"%s\":\n", name);
+    fflush(stdout);
 }
 
 void print_device_info(unsigned i, cl_device_id d)
@@ -264,6 +292,7 @@ void print_device_info(unsigned i, cl_device_id d)
     if (status != CL_SUCCESS)
 	fatal("clGetDeviceInfo (%d)\n", status);
     printf("  ID %d: %s\n", i, name);
+    fflush(stdout);
 }
 
 #ifdef ENABLE_DEBUG
@@ -493,13 +522,14 @@ void init_ht(cl_command_queue queue, cl_kernel k_init_ht, cl_mem buf_ht)
 }
 
 /*
-** Print on stdout a hex representation of the encoded solution as per the
-** zcash protocol specs (512 x 21-bit inputs).
+** Write ZCASH_SOL_LEN bytes representing the encoded solution as per the
+** Zcash protocol specs (512 x 21-bit inputs).
 **
-** inputs       array of 32-bit inputs
-** n            number of elements in array
+** out		ZCASH_SOL_LEN-byte buffer where the solution will be stored
+** inputs	array of 32-bit inputs
+** n		number of elements in array
 */
-void print_encoded_sol(uint32_t *inputs, uint32_t n)
+void store_encoded_sol(uint8_t *out, uint32_t *inputs, uint32_t n)
 {
     uint32_t byte_pos = 0;
     int32_t bits_left = PREFIX + 1;
@@ -529,10 +559,26 @@ void print_encoded_sol(uint32_t *inputs, uint32_t n)
           }
         if (x_bits_used == 8)
           {
-            printf("%02x", x);
+	    *out++ = x;
             x = x_bits_used = 0;
           }
       }
+}
+
+/*
+** Print on stdout a hex representation of the encoded solution as per the
+** zcash protocol specs (512 x 21-bit inputs).
+**
+** inputs	array of 32-bit inputs
+** n		number of elements in array
+*/
+void print_encoded_sol(uint32_t *inputs, uint32_t n)
+{
+    uint8_t	sol[ZCASH_SOL_LEN];
+    uint32_t	i;
+    store_encoded_sol(sol, inputs, n);
+    for (i = 0; i < sizeof (sol); i++)
+	printf("%02x", sol[i]);
     printf("\n");
     fflush(stdout);
 }
@@ -552,6 +598,62 @@ void print_sol(uint32_t *values, uint64_t *nonce)
     fprintf(stderr, "%s\n", (show_n_sols != (1 << PARAM_K) ? "..." : ""));
 }
 
+/*
+** Compare two 256-bit values interpreted as little-endian 256-bit integers.
+*/
+int32_t cmp_target_256(void *_a, void *_b)
+{
+    uint8_t	*a = _a;
+    uint8_t	*b = _b;
+    int32_t	i;
+    for (i = SHA256_TARGET_LEN - 1; i >= 0; i--)
+	if (a[i] != b[i])
+	    return (int32_t)a[i] - b[i];
+    return 0;
+}
+
+/*
+** Verify if the solution's block hash is under the target, and if yes print
+** it formatted as:
+** "sol: <job_id> <ntime> <nonce_rightpart> <solSize+sol>"
+**
+** Return 1 iff the block hash is under the target.
+*/
+uint32_t print_solver_line(uint32_t *values, uint8_t *header,
+	size_t fixed_nonce_bytes, uint8_t *target, char *job_id)
+{
+    uint8_t	buffer[ZCASH_BLOCK_HEADER_LEN + ZCASH_SOLSIZE_LEN +
+	ZCASH_SOL_LEN];
+    uint8_t	hash0[crypto_hash_sha256_BYTES];
+    uint8_t	hash1[crypto_hash_sha256_BYTES];
+    uint8_t	*p;
+    p = buffer;
+    memcpy(p, header, ZCASH_BLOCK_HEADER_LEN);
+    p += ZCASH_BLOCK_HEADER_LEN;
+    memcpy(p, "\xfd\x40\x05", ZCASH_SOLSIZE_LEN);
+    p += ZCASH_SOLSIZE_LEN;
+    store_encoded_sol(p, values, 1 << PARAM_K);
+    crypto_hash_sha256(hash0, buffer, sizeof (buffer));
+    crypto_hash_sha256(hash1, hash0, sizeof (hash0));
+    // compare the double SHA256 hash with the target
+    if (cmp_target_256(target, hash1) < 0)
+      {
+	debug("Hash is above target\n");
+	return 0;
+      }
+    debug("Hash is under target\n");
+    printf("sol: %s ", job_id);
+    p = header + ZCASH_BLOCK_OFFSET_NTIME;
+    printf("%02x%02x%02x%02x ", p[0], p[1], p[2], p[3]);
+    printf("%s ", s_hexdump(header + ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN +
+		fixed_nonce_bytes, ZCASH_NONCE_LEN - fixed_nonce_bytes));
+    printf("%s%s\n", ZCASH_SOLSIZE_HEX,
+	    s_hexdump(buffer + ZCASH_BLOCK_HEADER_LEN + ZCASH_SOLSIZE_LEN,
+		ZCASH_SOL_LEN));
+    fflush(stdout);
+    return 1;
+}
+
 int sol_cmp(const void *_a, const void *_b)
 {
     const uint32_t	*a = _a;
@@ -568,11 +670,17 @@ int sol_cmp(const void *_a, const void *_b)
 
 /*
 ** Print all solutions.
+**
+** In mining mode, return the number of shares, that is the number of solutions
+** that were under the target.
 */
-void print_sols(sols_t *all_sols, uint64_t *nonce, uint32_t nr_valid_sols)
+uint32_t print_sols(sols_t *all_sols, uint64_t *nonce, uint32_t nr_valid_sols,
+	uint8_t *header, size_t fixed_nonce_bytes, uint8_t *target,
+       	char *job_id)
 {
     uint8_t		*valid_sols;
     uint32_t		counted;
+    uint32_t		shares = 0;
     valid_sols = malloc(nr_valid_sols * SOL_SIZE);
     if (!valid_sols)
 	fatal("malloc: %s\n", strerror(errno));
@@ -587,18 +695,22 @@ void print_sols(sols_t *all_sols, uint64_t *nonce, uint32_t nr_valid_sols)
 	    counted++;
 	  }
     assert(counted == nr_valid_sols);
-    // sort the solutions amongst each other, to make silentarmy's output
+    // sort the solutions amongst each other, to make the solver's output
     // deterministic and testable
     qsort(valid_sols, nr_valid_sols, SOL_SIZE, sol_cmp);
     for (uint32_t i = 0; i < nr_valid_sols; i++)
       {
 	uint32_t	*inputs = (uint32_t *)(valid_sols + i * SOL_SIZE);
-	if (show_encoded)
+	if (!mining && show_encoded)
 	    print_encoded_sol(inputs, 1 << PARAM_K);
 	if (verbose)
 	    print_sol(inputs, nonce);
+	if (mining)
+	    shares += print_solver_line(inputs, header, fixed_nonce_bytes,
+		    target, job_id);
       }
     free(valid_sols);
+    return shares;
 }
 
 /*
@@ -661,7 +773,9 @@ uint32_t verify_sol(sols_t *sols, unsigned sol_i)
 /*
 ** Return the number of valid solutions.
 */
-uint32_t verify_sols(cl_command_queue queue, cl_mem buf_sols, uint64_t *nonce)
+uint32_t verify_sols(cl_command_queue queue, cl_mem buf_sols, uint64_t *nonce,
+	uint8_t *header, size_t fixed_nonce_bytes, uint8_t *target,
+       	char *job_id, uint32_t *shares)
 {
     sols_t	*sols;
     uint32_t	nr_valid_sols;
@@ -685,10 +799,14 @@ uint32_t verify_sols(cl_command_queue queue, cl_mem buf_sols, uint64_t *nonce)
     nr_valid_sols = 0;
     for (unsigned sol_i = 0; sol_i < sols->nr; sol_i++)
 	nr_valid_sols += verify_sol(sols, sol_i);
-    print_sols(sols, nonce, nr_valid_sols);
-    fprintf(stderr, "Nonce %s: %d sol%s\n",
-	    s_hexdump(nonce, ZCASH_NONCE_LEN), nr_valid_sols,
-	    nr_valid_sols == 1 ? "" : "s");
+    uint32_t sh = print_sols(sols, nonce, nr_valid_sols, header,
+	    fixed_nonce_bytes, target, job_id);
+    if (shares)
+	*shares = sh;
+    if (!mining || verbose)
+	fprintf(stderr, "Nonce %s: %d sol%s\n",
+		s_hexdump(nonce, ZCASH_NONCE_LEN), nr_valid_sols,
+		nr_valid_sols == 1 ? "" : "s");
     debug("Stats: %d likely invalids\n", sols->likely_invalids);
     free(sols);
     return nr_valid_sols;
@@ -708,13 +826,17 @@ uint32_t verify_sols(cl_command_queue queue, cl_mem buf_sols, uint64_t *nonce)
 **
 ** header	must be a buffer allocated with ZCASH_BLOCK_HEADER_LEN bytes
 ** header_len	number of bytes initialized in header (either 140 or 108)
+** shares	if not NULL, in mining mode the number of shares (ie. number
+**		of solutions that were under the target) are stored here
 **
 ** Return the number of solutions found.
 */
 uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
 	cl_kernel k_init_ht, cl_kernel *k_rounds, cl_kernel k_sols,
 	cl_mem *buf_ht, cl_mem buf_sols, cl_mem buf_dbg, size_t dbg_size,
-	uint8_t *header, size_t header_len, uint64_t nonce)
+	uint8_t *header, size_t header_len, uint64_t nonce,
+	size_t fixed_nonce_bytes, uint8_t *target, char *job_id,
+	uint32_t *shares)
 {
     blake2b_state_t     blake;
     cl_mem              buf_blake_st;
@@ -724,11 +846,17 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
     uint64_t		*nonce_ptr;
     assert(header_len == ZCASH_BLOCK_HEADER_LEN ||
 	    header_len == ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN);
+    if (mining)
+	assert(target && job_id);
     nonce_ptr = (uint64_t *)(header + ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN);
     if (header_len == ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN)
 	memset(nonce_ptr, 0, ZCASH_NONCE_LEN);
     // add the nonce
-    *nonce_ptr += nonce;
+    if (mining)
+	// increment bytes 16-19
+	*(uint32_t *)((uint8_t *)nonce_ptr + 16) += nonce;
+    else
+	*nonce_ptr += nonce;
     debug("\nSolving nonce %s\n", s_hexdump(nonce_ptr, ZCASH_NONCE_LEN));
     // Process first BLAKE2b-400 block
     zcash_blake2b_init(&blake, ZCASH_HASH_LEN, PARAM_N, PARAM_K);
@@ -767,9 +895,165 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
     global_ws = NR_ROWS;
     check_clEnqueueNDRangeKernel(queue, k_sols, 1, NULL,
 	    &global_ws, &local_work_size, 0, NULL, NULL);
-    sol_found = verify_sols(queue, buf_sols, nonce_ptr);
+    sol_found = verify_sols(queue, buf_sols, nonce_ptr, header,
+	    fixed_nonce_bytes, target, job_id, shares);
     clReleaseMemObject(buf_blake_st);
     return sol_found;
+}
+
+/*
+** Read a complete line from stdin. If 2 or more lines are available, store
+** only the last one in the buffer.
+**
+** buf		buffer to store the line
+** len		length of the buffer
+** block	blocking mode: do not return until a line was read
+**
+** Return 1 iff a line was read.
+*/
+int read_last_line(char *buf, size_t len, int block)
+{
+    char	*start;
+    size_t	pos = 0;
+    ssize_t	n;
+    set_blocking_mode(0, block);
+    while (42)
+      {
+	n = read(0, buf + pos, len - pos);
+	if (n == -1 && errno == EINTR)
+	    continue ;
+	else if (n == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
+	  {
+	    if (!pos)
+		return 0;
+	    warn("strange: a partial line was read\n");
+	    // a partial line was read, continue reading it in blocking mode
+	    // to be sure to read it completely
+	    set_blocking_mode(0, 1);
+	    continue ;
+	  }
+	else if (n == -1)
+	    fatal("read stdin: %s\n", strerror(errno));
+	else if (!n)
+	    fatal("EOF on stdin\n");
+	pos += n;
+	if (buf[pos - 1] == '\n')
+	    // 1 (or more) complete lines were read
+	    break ;
+      }
+    start = memrchr(buf, '\n', pos - 1);
+    if (start)
+      {
+	warn("strange: more than 1 line was read\n");
+	// more than 1 line; copy the last line to the beginning of the buffer
+	pos -= (start + 1 - buf);
+	memmove(buf, start + 1, pos);
+      }
+    // overwrite '\n' with NUL
+    buf[pos - 1] = 0;
+    return 1;
+}
+
+/*
+** Parse a string:
+**   "<target> <job_id> <header> <nonce_leftpart>"
+** (all the parts are in hex, except job_id which is a non-whitespace string),
+** decode the hex values and store them in the relevant buffers.
+**
+** The remaining part of <header> that is not set by
+** <header><nonce_leftpart> will be randomized so that the miner
+** solves a unique Equihash PoW.
+**
+** str		string to parse
+** target	buffer where the <target> will be stored
+** target_len	size of target buffer
+** job_id	buffer where the <job_id> will be stored
+** job_id_len	size of job_id buffer
+** header	buffer where the <header><nonce_leftpart> will be
+** 		concatenated and stored
+** header_len	size of the header_buffer
+** fixed_nonce_bytes
+** 		nr of bytes represented by <nonce_leftpart> will be stored here;
+** 		this is the number of nonce bytes fixed by the stratum server
+*/
+void mining_parse_job(char *str, uint8_t *target, size_t target_len,
+	char *job_id, size_t job_id_len, uint8_t *header, size_t header_len,
+	size_t *fixed_nonce_bytes)
+{
+    uint32_t		str_i, i;
+    // parse target
+    str_i = 0;
+    for (i = 0; i < target_len; i++, str_i += 2)
+	target[i] = hex2val(str, str_i) * 16 + hex2val(str, str_i + 1);
+    assert(str[str_i] == ' ');
+    str_i++;
+    // parse job_id
+    for (i = 0; i < job_id_len && str[str_i] != ' '; i++, str_i++)
+	job_id[i] = str[str_i];
+    assert(str[str_i] == ' ');
+    assert(i < job_id_len);
+    job_id[i] = 0;
+    str_i++;
+    // parse header and nonce_leftpart
+    for (i = 0; i < header_len && str[str_i] != ' '; i++, str_i += 2)
+	header[i] = hex2val(str, str_i) * 16 + hex2val(str, str_i + 1);
+    assert(str[str_i] == ' ');
+    str_i++;
+    *fixed_nonce_bytes = 0;
+    while (i < header_len && str[str_i])
+      {
+	header[i] = hex2val(str, str_i) * 16 + hex2val(str, str_i + 1);
+	i++;
+	str_i += 2;
+       	(*fixed_nonce_bytes)++;
+      }
+    assert(!str[str_i]);
+    // Randomize rest of the bytes except N_ZERO_BYTES bytes which must be zero
+    debug("Randomizing %d bytes in nonce\n", header_len - N_ZERO_BYTES - i);
+    randomize(header + i, header_len - N_ZERO_BYTES - i);
+    memset(header + header_len - N_ZERO_BYTES, 0, N_ZERO_BYTES);
+}
+
+/*
+** Run in mining mode.
+*/
+void mining_mode(cl_context ctx, cl_command_queue queue,
+	cl_kernel k_init_ht, cl_kernel *k_rounds, cl_kernel k_sols,
+	cl_mem *buf_ht, cl_mem buf_sols, cl_mem buf_dbg, size_t dbg_size,
+	uint8_t *header)
+{
+    char		line[4096];
+    uint8_t		target[32];
+    char		job_id[256];
+    size_t		fixed_nonce_bytes;
+    uint64_t		i;
+    uint64_t		total = 0;
+    uint32_t		shares;
+    uint64_t		total_shares = 0;
+    uint64_t		t0 = 0, t1;
+    uint64_t		status_period = 500e3; // time (usec) between statuses
+    puts("SILENTARMY mining mode ready");
+    fflush(stdout);
+    for (i = 0; ; i++)
+      {
+        // iteration #0 always reads a job or else there is nothing to do
+        if (read_last_line(line, sizeof (line), !i))
+            mining_parse_job(line,
+                    target, sizeof (target),
+                    job_id, sizeof (job_id),
+                    header, ZCASH_BLOCK_HEADER_LEN,
+                    &fixed_nonce_bytes);
+        total += solve_equihash(ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
+                buf_sols, buf_dbg, dbg_size, header, ZCASH_BLOCK_HEADER_LEN, i,
+                fixed_nonce_bytes, target, job_id, &shares);
+        total_shares += shares;
+        if ((t1 = now()) > t0 + status_period)
+          {
+            t0 = t1;
+            printf("status: %ld %ld\n", total, total_shares);
+            fflush(stdout);
+          }
+      }
 }
 
 void run_opencl(uint8_t *header, size_t header_len, cl_context ctx,
@@ -785,7 +1069,8 @@ void run_opencl(uint8_t *header, size_t header_len, cl_context ctx,
 #endif
     uint64_t		nonce;
     uint64_t		total;
-    fprintf(stderr, "Hash tables will use %.1f MB\n", 2.0 * HT_SIZE / 1e6);
+    if (!mining || verbose)
+	fprintf(stderr, "Hash tables will use %.1f MB\n", 2.0 * HT_SIZE / 1e6);
     // Set up buffers for the host and memory objects for the kernel
     if (!(dbg = calloc(dbg_size, 1)))
 	fatal("malloc: %s\n", strerror(errno));
@@ -795,13 +1080,17 @@ void run_opencl(uint8_t *header, size_t header_len, cl_context ctx,
     buf_ht[1] = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, HT_SIZE, NULL);
     buf_sols = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof (sols_t),
 	    NULL);
+    if (mining)
+	mining_mode(ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
+		buf_sols, buf_dbg, dbg_size, header);
     fprintf(stderr, "Running...\n");
-    // Solve Equihash for a few nonces
     total = 0;
     uint64_t t0 = now();
+    // Solve Equihash for a few nonces
     for (nonce = 0; nonce < nr_nonces; nonce++)
 	total += solve_equihash(ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
-		buf_sols, buf_dbg, dbg_size, header, header_len, nonce);
+		buf_sols, buf_dbg, dbg_size, header, header_len, nonce,
+		0, NULL, NULL, NULL);
     uint64_t t1 = now();
     fprintf(stderr, "Total %ld solutions in %.1f ms (%.1f Sol/s)\n",
 	    total, (t1 - t0) / 1e3, total / ((t1 - t0) / 1e6));
@@ -830,13 +1119,13 @@ void run_opencl(uint8_t *header, size_t header_len, cl_context ctx,
 unsigned scan_platform(cl_platform_id plat, cl_uint *nr_devs_total,
 	cl_platform_id *plat_id, cl_device_id *dev_id)
 {
-    cl_device_type	typ = CL_DEVICE_TYPE_GPU; // only look for GPUs
+    cl_device_type	typ = CL_DEVICE_TYPE_ALL;
     cl_uint		nr_devs = 0;
     cl_device_id	*devices;
     cl_int		status;
     unsigned		found = 0;
     unsigned		i;
-    if (do_list_gpu)
+    if (do_list_devices)
 	print_platform_info(plat);
     status = clGetDeviceIDs(plat, typ, 0, NULL, &nr_devs);
     if (status != CL_SUCCESS)
@@ -850,7 +1139,7 @@ unsigned scan_platform(cl_platform_id plat, cl_uint *nr_devs_total,
     i = 0;
     while (i < nr_devs)
       {
-	if (do_list_gpu)
+	if (do_list_devices)
 	    print_device_info(*nr_devs_total, devices[i]);
 	else if (*nr_devs_total == gpu_to_use)
 	  {
@@ -899,7 +1188,7 @@ void scan_platforms(cl_platform_id *plat_id, cl_device_id *dev_id)
 	    break ;
 	i++;
       }
-    if (do_list_gpu)
+    if (do_list_devices)
 	exit(0);
     debug("Using GPU device ID %d\n", gpu_to_use);
     free(platforms);
@@ -913,7 +1202,7 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
     cl_int		status;
     scan_platforms(&plat_id, &dev_id);
     if (!plat_id || !dev_id)
-	fatal("Selected GPU (ID %d) not found; see --list-gpu\n", gpu_to_use);
+	fatal("Selected device (ID %d) not found; see --list\n", gpu_to_use);
     /* Create context.*/
     cl_context context = clCreateContext(NULL, 1, &dev_id,
 	    NULL, NULL, &status);
@@ -936,7 +1225,8 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
     if (status != CL_SUCCESS || !program)
 	fatal("clCreateProgramWithSource (%d)\n", status);
     /* Build program. */
-    fprintf(stderr, "Building program\n");
+    if (!mining || verbose)
+	fprintf(stderr, "Building program\n");
     status = clBuildProgram(program, 1, &dev_id,
 	    "", // compile options
 	    NULL, NULL);
@@ -977,13 +1267,6 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
 	fprintf(stderr, "Cleaning resources failed\n");
 }
 
-void print_header(uint8_t *h, size_t len)
-{
-    for (uint32_t i = 0; i < len; i++)
-	printf("%02x", h[i]);
-    printf(" (%zd bytes)\n", len);
-}
-
 uint32_t parse_header(uint8_t *h, size_t h_len, const char *hex)
 {
     size_t      hex_len;
@@ -993,7 +1276,7 @@ uint32_t parse_header(uint8_t *h, size_t h_len, const char *hex)
     size_t      i;
     if (!hex)
       {
-	if (!do_list_gpu)
+	if (!do_list_devices && !mining)
 	    fprintf(stderr, "Solving default all-zero %zd-byte header\n", opt0);
 	return opt1;
       }
@@ -1008,11 +1291,12 @@ uint32_t parse_header(uint8_t *h, size_t h_len, const char *hex)
     for (i = 0; i < bin_len; i ++)
 	h[i] = hex2val(hex, i * 2) * 16 + hex2val(hex, i * 2 + 1);
     if (bin_len == opt0)
-	while (--i >= bin_len - 12)
+	while (--i >= bin_len - N_ZERO_BYTES)
 	    if (h[i])
-		fatal("Error: last 12 bytes of full header (ie. last 12 "
+		fatal("Error: last %d bytes of full header (ie. last %d "
 			"bytes of 32-byte nonce) must be zero due to an "
-			"optimization in my BLAKE2b implementation\n");
+			"optimization in my BLAKE2b implementation\n",
+			N_ZERO_BYTES, N_ZERO_BYTES);
     return bin_len;
 }
 
@@ -1025,8 +1309,9 @@ enum
     OPT_THREADS,
     OPT_N,
     OPT_K,
-    OPT_LIST_GPU,
+    OPT_LIST,
     OPT_USE,
+    OPT_MINING,
 };
 
 static struct option    optlong[] =
@@ -1040,15 +1325,16 @@ static struct option    optlong[] =
       {"t",		required_argument,	0,	OPT_THREADS},
       {"n",		required_argument,	0,	OPT_N},
       {"k",		required_argument,	0,	OPT_K},
-      {"list-gpu",	no_argument,		0,	OPT_LIST_GPU},
+      {"list",		no_argument,		0,	OPT_LIST},
       {"use",		required_argument,	0,	OPT_USE},
+      {"mining",	no_argument,		0,	OPT_MINING},
       {0,		0,			0,	0},
 };
 
 void usage(const char *progname)
 {
     printf("Usage: %s [options]\n"
-	    "Silentarmy is a GPU Zcash Equihash solver.\n"
+	    "A standalone GPU Zcash Equihash solver.\n"
 	    "\n"
 	    "Options are:\n"
             "  -h, --help     display this help and exit\n"
@@ -1061,8 +1347,10 @@ void usage(const char *progname)
             "  --nonces <nr>  number of nonces to try (default: 1)\n"
             "  -n <n>         equihash n param (only supported value is 200)\n"
             "  -k <k>         equihash k param (only supported value is 9)\n"
-            "  --list-gpu     list available GPU devices\n"
+            "  --list         list available OpenCL devices by ID (GPUs...)\n"
             "  --use <id>     use GPU <id> (default: 0)\n"
+            "  --mining       enable mining mode (solver controlled via "
+	    "stdin/stdout)\n"
             , progname);
 }
 
@@ -1106,11 +1394,14 @@ int main(int argc, char **argv)
                 if (PARAM_K != parse_num(optarg))
                     fatal("Unsupported k (must be %d)\n", PARAM_K);
                 break ;
-	    case OPT_LIST_GPU:
-		do_list_gpu = 1;
+	    case OPT_LIST:
+		do_list_devices = 1;
 		break ;
 	    case OPT_USE:
 		gpu_to_use = parse_num(optarg);
+		break ;
+	    case OPT_MINING:
+		mining = 1;
 		break ;
             default:
                 fatal("Try '%s --help'\n", argv[0]);

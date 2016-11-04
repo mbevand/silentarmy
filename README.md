@@ -1,50 +1,101 @@
 # SILENTARMY
 
-SILENTARMY is an OpenCL GPU Zcash Equihash solver. It runs best on AMD GPUs
-and implements the CLI API described in the
-[Zcash open source miner challenge](https://zcashminers.org/rules).
+SILENTARMY is a [Zcash](https://z.cash) miner for Linux written in OpenCL with
+multi-GPU support. The
+[Stratum](https://github.com/str4d/zips/blob/77-zip-stratum/drafts/str4d-stratum/draft1.rst) protocol is implemented for connecting to mining pools. It runs
+best on AMD GPUs but has also been reported to work on other OpenCL devices such
+as Xeon Phi, Intel GPUs, and through OpenCL CPU drivers. (Nvidia GPUs are not
+currently supported due to an
+[issue](https://github.com/mbevand/silentarmy/issues/6).)
 
+After compiling SILENTARMY, list the available OpenCL devices:
+
+`$ silentarmy --list`
+
+Start mining with two GPUs (ID 2 and ID 5) on a pool:
+
+`$ silentarmy --use 2,5 -c stratum+tcp://us1-zcash.flypool.org:3333 -u t1cVviFvgJinQ4w3C2m2CfRxgP5DnHYaoFC`
+
+Usage:
+
+```
+$ silentarmy --help
+Usage: silentarmy [options]
+
+Options:
+  -h, --help            show this help message and exit
+  -v, --verbose         verbose mode (may be repeated for more verbosity)
+  --debug               enable debug mode (for developers only)
+  --list                list available OpenCL devices by ID (GPUs...)
+  --use=LIST            use specified GPU device IDs to mine, for example to
+                        use the first three: 0,1,2 (default: 0)
+  --instances=N         run N instances of Equihash per GPU (default: 2)
+  -c POOL, --connect=POOL
+                        connect to POOL, for example:
+                        stratum+tcp://example.com:1234
+  -u USER, --user=USER  username for connecting to the pool
+  -p PWD, --pwd=PWD     password for connecting to the pool
+```
+
+# Equihash solver
+
+SILENTARMY also provides a command line Equihash solver (`sa-solver`)
+implementing the CLI API described in the
+[Zcash open source miner challenge](https://zcashminers.org/rules).
 To solve a specific block header and print the encoded solution on stdout, run
 the following command (this header is from
-[testnet block #2680](https://explorer.testnet.z.cash/block/0000045e1a6af7b9017190297177807f98d60144b5aa525b6ae152c2ddc64966)
-and should result in 3 solutions):
+[mainnet block #3400](https://explorer.zcha.in/blocks/00000001687e89e7e1ce48b349e601c89c70dd4c268fdf24b269a3ca4140426f)
+and should result in 1 Equihash solution):
 
-    $ silentarmy -i 0400000052a6a17bb3cf95c62ec140d22f4fe96cfbc192ff288251282174481312040000b9711b4850b4b89598e16103148a8a368f74e472fa919ac7d0dbb57b1090f6c80000000000000000000000000000000000000000000000000000000000000000667211581e1b071e4302000000000000020000000000000000000000000000000000000000000000
+`$ sa-solver -i 04000000e54c27544050668f272ec3b460e1cde745c6b21239a81dae637fde4704000000844bc0c55696ef9920eeda11c1eb41b0c2e7324b46cc2e7aa0c2aa7736448d7a000000000000000000000000000000000000000000000000000000000000000068241a587e7e061d250e000000000000010000000000000000000000000000000000000000000000`
 
-If the option `-i` is not specified, SILENTARMY solves a 140-byte header of all
-zero bytes. The option `--nonces <nr>` instructs SILENTARMY to try multiple
+If the option `-i` is not specified, `sa-solver` solves a 140-byte header of all
+zero bytes. The option `--nonces <nr>` instructs the program to try multiple
 nonces, each time incrementing the nonce by 1. So a convenient way to run a
-benchmark is simply:
+quick test/benchmark is simply:
 
-    $ silentarmy --nonces 100
+`$ sa-solver --nonces 100`
 
 Note: due to BLAKE2b optimizations in my implementation, if the header is
 specified it must be 140 bytes and its last 12 bytes **must** be zero. For
 convenience, `-i` can also specify a 108-byte nonceless header to which
-SILENTARMY adds an implicit nonce of 32 zero bytes.
+`sa-solver` adds an implicit nonce of 32 zero bytes.
 
 Use the verbose (`-v`) and very verbose (`-v -v`) options to show the solutions
 and statistics in progressively more and more details.
 
 # Performance
 
-* 45.7 Sol/s with one R9 Nano
-* 39.6 Sol/s with one RX 480 8GB
+* 47.5 Sol/s with one R9 Nano
+* 41.0 Sol/s with one RX 480 8GB
 
-Note: run 2 instances of SILENTARMY in parallel (eg. in 2 terminal consoles)
-on the same GPU to reach these performance numbers. The code is currently very
-poorly optimized; it makes zero attempts to keep the queue of OpenCL commands
-full, therefore 2 instances are needed to keep the GPU fully utilized.
+Note: the `silentarmy` **miner** automatically achieves this performance level,
+however the `sa-solver` **command-line solver** by design runs only 1 instance
+of the Equihash proof-of-work algorithm causing it to underperform. One must
+manually run 2 instances of `sa-solver` (eg. in 2 terminal consoles) to
+achieve the same performance level as the `silentarmy` **miner**.
+
+Troubleshooting performance issues:
+* By default SILENTARMY mines with only one device/GPU; make sure to specify
+  all the GPUs in the `--use` option, for example `silentarmy --use 0,1,2`
+  if the host has three devices with IDs 0, 1, and 2.
+* If some GPUs have less than ~2.4 GB of GPU memory, run
+  `silentarmy --instances 1 --use ...` (2 instances use ~2.4 GB of GPU memory,
+  1 instance uses ~1.2 GB of GPU memory.)
+* If 1 instance still requires too much memory, edit `param.h` and set
+  `NR_ROWS_LOG` to `19` (this reduces the per-instance memory usage to ~670 MB)
+  and run with `--instances 1`.
 
 # Dependencies
 
-SILENTARMY has primarily been tested with AMD GPUs on 64-bit Linux with the
-**AMDGPU-PRO** driver (amdgpu.ko) or the **Radeon Software Crimson Edition**
-driver (fglrx.ko). Its only build dependency is the OpenCL C headers from the
-**AMD APP SDK**.
+SILENTARMY has primarily been tested with AMD GPUs on 64-bit Linux with either
+the **AMDGPU-PRO** driver (amdgpu.ko, for newer GPUs) or the **Radeon Software
+Crimson Edition** driver (fglrx.ko, for older GPUs). Its only build
+dependencies are an OpenCL implementation and the libsodium library.
 
 Installation of the drivers and SDK can be error-prone, so below are
-step-by-step instructions for Ubuntu 16.04 as well as Ubuntu 14.04.
+step-by-step instructions for the AMD OpenCL implementation (**AMD APP SDK**),
+for Ubuntu 16.04 as well as Ubuntu 14.04.
 
 ## Ubuntu 16.04
 
@@ -71,8 +122,8 @@ step-by-step instructions for Ubuntu 16.04 as well as Ubuntu 14.04.
 8. Install system-wide by running as root (accept all the default options):
   `$ sudo ./AMD-APP-SDK-v3.0.130.136-GA-linux64.sh`
 
-9. Install a compiler tools which you will need to compile SILENTARMY:
-  `$ sudo apt-get install build-essential`
+9. Install compiler dependencies which you will need to compile SILENTARMY:
+  `$ sudo apt-get install build-essential libsodium-dev`
 
 ## Ubuntu 14.04
 
@@ -88,25 +139,35 @@ Compiling SILENTARMY is easy:
 
 `$ make`
 
-You may need to edit the `Makefile` and change the path
-`/opt/AMDAPPSDK-3.0/include` if **AMD APP SDK** was installed in a non-default
-location. Also if you are not using the **AMDGPU-PRO Driver** you may need
-to edit the `Makefile` and change the path to `libOpenCL.so`.
+You may need to specify the paths to the locations of your OpenCL C headers
+and libOpenCL.so if the Makefile does not find them:
 
-Self-testing (solves 100 all-zero 140-byte blocks with their nonces varying
-from 0 to 99):
+`$ make OPENCL_HEADERS=/path/here LIBOPENCL=/path/there`
+
+Self-testing the command-line solver (solves 100 all-zero 140-byte blocks with
+their nonces varying from 0 to 99):
 
 `$ make test`
 
-For more testing run `silentarmy --nonces 10000`. It should finds 18681
+For more testing run `sa-solver --nonces 10000`. It should finds 18681
 solutions which is less than 1% off the theoretical expected average number of
 solutions of 1.88 per Equihash run at (n,k)=(200,9).
 
-For installing, just copy `silentarmy` wherever.
+For installing, just copy `silentarmy` and `sa-solver` to the same directory.
 
 # Implementation details
 
-SILENTARMY uses two hash tables to avoid having to sort the (Xi,i) pairs:
+The `silentarmy` Python script is actually mostly a lighteight Stratum
+implementation and job dispatcher that sends Equihash work items to 1 or more
+instances of `sa-solver --mining` which initializes the solver in a special
+"mining mode" so it can be controled via stdin/stdout. By default 2 instances
+of `sa-solver` are launched for each GPU (this can be changed with the
+`silentarmy --instances N` option.) 2 instances per GPU usually results in the
+best performance.
+
+The `sa-solver` binary invokes the OpenCL kernel which contains the core of the
+Equihash algorithm. My implementation uses two hash tables to avoid having to
+sort the (Xi,i) pairs:
 
 * Round 0 (BLAKE2b) fills up table #0
 * Round 1 reads table #0, identifies collisions, XORs the Xi's, stores
@@ -156,6 +217,8 @@ supports Equihash parameters 200,9.
 # Author
 
 Marc Bevand -- [http://zorinaq.com](http://zorinaq.com)
+
+Donations welcome: t1cVviFvgJinQ4w3C2m2CfRxgP5DnHYaoFC
 
 # License
 

@@ -1,0 +1,27 @@
+#!/bin/sh
+
+echo "SILENTARMY mining mode ready"
+i=0
+while read job; do
+    # job is:
+    # <target> <job_id> <header> <nonce_leftpart>
+    job_id=$(echo $job | cut -d' ' -f2)
+    (
+    j=0
+    while [ $j -lt 5 ]; do
+        sleep 1
+        # output is:
+        # sol: <job_id> <ntime> <nonce_rightpart> <solSize+sol>
+        echo "sol: $job_id 11223358 1111 2222"`printf %02x $j`
+        j=$(($j+1))
+    done
+    ) &
+    sleep .6
+    # occasionnaly report statistics:
+    # status: <nr_sols> <nr_shares>
+    echo "status: 100 10"
+    sleep .6
+    echo "hello world"
+done
+echo 'i am done'
+exit 42
