@@ -40,6 +40,11 @@ from .log import logger
 
 __all__ = ['BaseEventLoop']
 
+# lhl: We need to add this back in because 3.3 doesn't have a default max_workers in ThreadPoolExecuter
+# https://bugs.python.org/issue26796
+# https://docs.python.org/3/library/asyncio-eventloop.html#executor 
+# https://docs.python.org/3/library/concurrent.futures.html
+_MAX_WORKERS=8
 
 # Minimum number of _scheduled timer handles before cleanup of
 # cancelled handles is performed.
@@ -619,7 +624,10 @@ class BaseEventLoop(events.AbstractEventLoop):
         if executor is None:
             executor = self._default_executor
             if executor is None:
-                executor = concurrent.futures.ThreadPoolExecutor()
+                try:
+                    executor = concurrent.futures.ThreadPoolExecutor()
+                except:
+                    executor = concurrent.futures.ThreadPoolExecutor(_MAX_WORKERS)
                 self._default_executor = executor
         return futures.wrap_future(executor.submit(func, *args), loop=self)
 
