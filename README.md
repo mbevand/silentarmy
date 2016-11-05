@@ -110,10 +110,10 @@ Troubleshooting performance issues:
 
 # Dependencies
 
-SILENTARMY has primarily been tested with AMD GPUs on 64-bit Linux with either
-the **AMDGPU-PRO** driver (amdgpu.ko, for newer GPUs) or the **Radeon Software
+SILENTARMY has primarily been tested with AMD GPUs on 64-bit Linux with
+the **AMDGPU-PRO** driver (amdgpu.ko, for newer GPUs) and the **Radeon Software
 Crimson Edition** driver (fglrx.ko, for older GPUs). Its only build
-dependencies are an OpenCL implementation and the libsodium library.
+dependency is an OpenCL implementation.
 
 Installation of the drivers and SDK can be error-prone, so below are
 step-by-step instructions for the AMD OpenCL implementation (**AMD APP SDK**),
@@ -148,7 +148,7 @@ use of Python's `ensure_future()` which requires Python 3.4.4, however Ubuntu
   `$ sudo ./AMD-APP-SDK-v3.0.130.136-GA-linux64.sh`
 
 9. Install compiler dependencies which you will need to compile SILENTARMY:
-  `$ sudo apt-get install build-essential libsodium-dev`
+  `$ sudo apt-get install build-essential`
 
 ## Ubuntu 14.04
 
