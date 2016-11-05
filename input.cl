@@ -532,12 +532,15 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
     if (!cnt)
 	// no elements in row, no collisions
 	return ;
+#if NR_ROWS_LOG != 20 || !OPTIM_FOR_FGLRX
     p += xi_offset;
     for (i = 0; i < cnt; i++, p += SLOT_LEN)
         first_words[i] = *(__global uchar *)p;
+#endif
     // find collisions
     for (i = 0; i < cnt; i++)
         for (j = i + 1; j < cnt; j++)
+#if NR_ROWS_LOG != 20 || !OPTIM_FOR_FGLRX
             if ((first_words[i] & mask) ==
 		    (first_words[j] & mask))
               {
@@ -558,6 +561,9 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
       {
         i = collisions[n] & 0xff;
         j = collisions[n] >> 8;
+#else
+      {
+#endif
         a = (__global ulong *)
             (ht_src + tid * NR_SLOTS * SLOT_LEN + i * SLOT_LEN + xi_offset);
         b = (__global ulong *)
