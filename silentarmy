@@ -465,7 +465,10 @@ class Silentarmy:
                     print("Stratum server returned an error: %s" % msg['error'])
                     return
                 if msg['id'] != self.st_expected_id:
-                    verbose("Stratum server returned wrong id: %s" % msg['id'])
+                    # XXX need to track which outstanding IDs we are waiting
+                    # a response for
+                    very_verbose("Stratum server returned wrong id: %s" % \
+                            msg['id'])
                     # attempt to proceed and ignore this error
                 self.st_expected_id = None
                 if self.st_state == 'SENT_SUBSCRIBE':
