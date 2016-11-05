@@ -529,6 +529,9 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
     p = (ht_src + tid * NR_SLOTS * SLOT_LEN);
     cnt = *(__global uint *)p;
     cnt = min(cnt, (uint)NR_SLOTS); // handle possible overflow in prev. round
+    if (!cnt)
+	// no elements in row, no collisions
+	return ;
     p += xi_offset;
     for (i = 0; i < cnt; i++, p += SLOT_LEN)
         first_words[i] = *(__global uchar *)p;
