@@ -10,9 +10,9 @@ CPPFLAGS = -std=gnu99 -pedantic -Wextra -Wall -ggdb \
     -Wno-overlength-strings \
     -I${OPENCL_HEADERS}
 LDFLAGS = -rdynamic -L${LIBOPENCL}
-LDLIBS = -lOpenCL -lsodium
-OBJ = main.o blake.o
-INCLUDES = blake.h param.h _kernel.h
+LDLIBS = -lOpenCL
+OBJ = main.o blake.o sha256.o
+INCLUDES = blake.h param.h _kernel.h sha256.h
 
 all : sa-solver
 
