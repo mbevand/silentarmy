@@ -498,10 +498,9 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
 {
     uint                tid = get_global_id(0);
     uint		tlid = get_local_id(0);
-    __global char       *p;
+    __global uint       *rowptr;
     uint                cnt;
-    uchar		first_words[NR_SLOTS];
-    uchar		mask;
+    uchar               mask;
     uint                i, j, n;
     uint                dropped_coll, dropped_stor;
     __global ulong      *a, *b;
@@ -520,13 +519,11 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
 #else
 #error "unsupported NR_ROWS_LOG"
 #endif
-    p = (ht_src + tid * NR_SLOTS * SLOT_LEN);
-    cnt = *(__global uint *)p;
+    rowptr = (__global uint *)(ht_src + tid * NR_SLOTS * SLOT_LEN);
+    cnt = *rowptr;
+    if (cnt == 0) return;
     cnt = min(cnt, (uint)NR_SLOTS); // handle possible overflow in prev. round
-    p += xi_offset;
-    for (i = 0; i < cnt; i++, p += SLOT_LEN)
-        first_words[i] = *(__global uchar *)p;
-    // find collisions
+
     dropped_stor = 0;
     for (i = 0; i < cnt; i++)
         for (j = i + 1; j < cnt; j++)
@@ -538,9 +535,9 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
             (ht_src + tid * NR_SLOTS * SLOT_LEN + j * SLOT_LEN + xi_offset);
 	dropped_stor += xor_and_store(round, ht_dst, tid, i, j, a, b);
       }
-    if (round < 8)
+
 	// reset the counter in preparation of the next round
-	*(__global uint *)(ht_src + tid * NR_SLOTS * SLOT_LEN) = 0;
+    if (round < 8) *rowptr = 0;
 #ifdef ENABLE_DEBUG
     debug[tid * 2] = dropped_coll;
     debug[tid * 2 + 1] = dropped_stor;
