@@ -337,13 +337,13 @@ class Silentarmy:
                     *decoded[1:]))
             elif decoded[0] == 'status':
                 (nr_sols, nr_shares) = decoded[1:]
-                verbose('Solver %s: since starting, found %d sols %d shares' %
+                very_verbose('Solver %s: found %d sols %d shares so far' %
                         (devid, nr_sols, nr_shares))
                 self.total_sols[devid] = nr_sols
                 self.total_shares[devid] = nr_shares
             elif decoded[0] == 'msg':
                 (msg,) = decoded[1:]
-                verbose('Solver %s: reported: %s' % (devid, msg))
+                very_verbose('Solver %s: reported: %s' % (devid, msg))
             else:
                 fatal('Invalid solver line: %s' % repr(decoded))
 
@@ -481,7 +481,7 @@ class Silentarmy:
                     self.update_mining_job()
                 elif self.st_state == 'AUTHORIZED':
                     # result: succeeded
-                    verbose("Stratum server accepted a share")
+                    very_verbose("Stratum server accepted a share")
                     self.st_accepted += 1
                 else:
                     fatal('Bug: unknown state %s' % self.st_state)
