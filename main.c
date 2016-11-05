@@ -119,25 +119,21 @@ void show_time(uint64_t t0)
     fprintf(stderr, "Elapsed time: %.1f msec\n", (t1 - t0) / 1e3);
 }
 
+#ifndef WIN32
 void set_blocking_mode(int fd, int block)
 {
-#ifndef WIN32
-	int		f;
+
+	int	f;
     if (-1 == (f = fcntl(fd, F_GETFL)))
 	fatal("fcntl F_GETFL: %s\n", strerror(errno));
     if (-1 == fcntl(fd, F_SETFL, block ? (f & ~O_NONBLOCK) : (f | O_NONBLOCK)))
 		fatal("fcntl F_SETFL: %s\n", strerror(errno));
-#else
-	ulong mode = block ? 0UL : 1UL;
-	if (0 != ioctlsocket(fd, FIONBIO, &mode))
-		fatal("ioctlsocket error: %d\n", WSAGetLastError());
-#endif
-	
-
 }
+#endif
 
 void randomize(void *p, ssize_t l)
 {
+#ifndef WIN32
     const char	*fname = "/dev/urandom";
     int		fd;
     ssize_t	ret;
@@ -149,6 +145,10 @@ void randomize(void *p, ssize_t l)
 	fatal("%s: short read %d bytes out of %d\n", fname, ret, l);
     if (-1 == close(fd))
 	fatal("close %s: %s\n", fname, strerror(errno));
+#else
+	for (int i = 0; i < l; i++)
+		((uint8_t *)p)[i] = rand() & 0xff;
+#endif
 }
 
 cl_mem check_clCreateBuffer(cl_context ctx, cl_mem_flags flags, size_t size,
@@ -1039,7 +1039,6 @@ void mining_parse_job(char *str, uint8_t *target, size_t target_len,
 	char *job_id, size_t job_id_len, uint8_t *header, size_t header_len,
 	size_t *fixed_nonce_bytes)
 {
-	//printf("%s", str);
     uint32_t		str_i, i;
     // parse target
     str_i = 0;
@@ -1060,7 +1059,7 @@ void mining_parse_job(char *str, uint8_t *target, size_t target_len,
     assert(str[str_i] == ' ');
     str_i++;
     *fixed_nonce_bytes = 0;
-    while (i < header_len && str[str_i])
+	while (i < header_len && str[str_i] && str[str_i] != '\n')
       {
 	header[i] = hex2val(str, str_i) * 16 + hex2val(str, str_i + 1);
 	i++;
@@ -1094,24 +1093,10 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
     uint64_t		status_period = 500e3; // time (usec) between statuses
     puts("SILENTARMY mining mode ready");
     fflush(stdout);
-
 #ifdef WIN32
-	WORD wVersionRequested;
-	WSADATA wsaData;
-	int err;
-
-	/* Use the MAKEWORD(lowbyte, highbyte) macro declared in Windef.h */
-	wVersionRequested = MAKEWORD(2, 2);
-
-	err = WSAStartup(wVersionRequested, &wsaData);
-	if (err != 0) {
-		/* Tell the user that we could not find a usable */
-		/* Winsock DLL.                                  */
-		printf("WSAStartup failed with error: %d\n", err);
-		fflush(stdout);
-	}
+	srand(time(NULL));
+	//SetConsoleOutputCP(65001);
 #endif
-
     for (i = 0; ; i++)
       {
         // iteration #0 always reads a job or else there is nothing to do

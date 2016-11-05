@@ -303,6 +303,7 @@ class Silentarmy:
             self.cleanup_solvers(devid)
             return
         banner = banner.decode('ascii').rstrip()
+        print(banner)
         very_verbose('From solver %s: banner "%s"' % (devid, banner))
         if banner != "SILENTARMY mining mode ready":
             print('Solver %s: unexpected banner "%s"' % (devid, banner))
@@ -371,7 +372,7 @@ class Silentarmy:
                 bytes.hex(self.nonce_leftpart))
         very_verbose('To solvers: %s' % job.rstrip())
         for devid in self.solver_procs:
-            self.solver_procs[devid].stdin.write(job.encode('ascii'))
+            self.solver_procs[devid].stdin.write(job.encode('utf8'))
 
     def set_nonce_leftpart(self, n):
         self.nonce_leftpart = bytes.fromhex(n)
