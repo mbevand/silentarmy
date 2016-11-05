@@ -1,5 +1,6 @@
 # Current tip
 
+* Drop the libsodium dependency; instead use our own SHA256 implementation
 * Only apply set_target to *next* mining job
 * Do not abandon previous mining jobs if clean_jobs is false
 * Fix KeyError's when displaying stats

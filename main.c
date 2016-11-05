@@ -12,10 +12,10 @@
 #include <unistd.h>
 #include <getopt.h>
 #include <errno.h>
-#include <sodium.h>
 #include <CL/cl.h>
 #include "blake.h"
 #include "_kernel.h"
+#include "sha256.h"
 
 typedef uint8_t		uchar;
 typedef uint32_t	uint;
@@ -624,8 +624,8 @@ uint32_t print_solver_line(uint32_t *values, uint8_t *header,
 {
     uint8_t	buffer[ZCASH_BLOCK_HEADER_LEN + ZCASH_SOLSIZE_LEN +
 	ZCASH_SOL_LEN];
-    uint8_t	hash0[crypto_hash_sha256_BYTES];
-    uint8_t	hash1[crypto_hash_sha256_BYTES];
+    uint8_t	hash0[SHA256_DIGEST_SIZE];
+    uint8_t	hash1[SHA256_DIGEST_SIZE];
     uint8_t	*p;
     p = buffer;
     memcpy(p, header, ZCASH_BLOCK_HEADER_LEN);
@@ -633,8 +633,8 @@ uint32_t print_solver_line(uint32_t *values, uint8_t *header,
     memcpy(p, "\xfd\x40\x05", ZCASH_SOLSIZE_LEN);
     p += ZCASH_SOLSIZE_LEN;
     store_encoded_sol(p, values, 1 << PARAM_K);
-    crypto_hash_sha256(hash0, buffer, sizeof (buffer));
-    crypto_hash_sha256(hash1, hash0, sizeof (hash0));
+    Sha256_Onestep(buffer, sizeof (buffer), hash0);
+    Sha256_Onestep(hash0, sizeof (hash0), hash1);
     // compare the double SHA256 hash with the target
     if (cmp_target_256(target, hash1) < 0)
       {
@@ -1023,7 +1023,7 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
 	uint8_t *header)
 {
     char		line[4096];
-    uint8_t		target[32];
+    uint8_t		target[SHA256_DIGEST_SIZE];
     char		job_id[256];
     size_t		fixed_nonce_bytes;
     uint64_t		i;
