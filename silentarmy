@@ -17,7 +17,7 @@ if PY_VERSION >= 344:
     import asyncio
 else:
     LIBPATH = os.path.dirname(os.path.realpath(__file__)) + '/lib/asyncio'
-    sys.path.append(LIBPATH)
+    sys.path.insert(1,LIBPATH)
     import asyncio
 
 verbose_level = 0
