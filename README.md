@@ -255,6 +255,12 @@ Marc Bevand -- [http://zorinaq.com](http://zorinaq.com)
 
 Donations welcome: t1cVviFvgJinQ4w3C2m2CfRxgP5DnHYaoFC
 
+# Thanks
+
+I would like to thank these persons for their contributions to SILENTARMY,
+in alphabetical order:
+* nerdralph
+
 # License
 
 The MIT License (MIT)
