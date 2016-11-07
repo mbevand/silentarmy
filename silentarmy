@@ -476,8 +476,9 @@ class Silentarmy:
                 if self.st_state == 'SENT_SUBSCRIBE':
                     # result: [ <ignored>, nonce_leftpart ]
                     self.set_nonce_leftpart(msg['result'][1])
-                    if self.opts.extranonce_subscribe:
+                    if self.opts.extranonce_subscribe or re.match(r'equihash.*.nicehash.com', self.host):
                         self.st_state = 'SENT_EXTRANONCE_SUBSCRIBE'
+                        verbose("mining.extranonce.subscribe enabled")
                         return self.stratum_msg('mining.extranonce.subscribe')
                     else:
                         self.st_state = 'SENT_AUTHORIZE'
