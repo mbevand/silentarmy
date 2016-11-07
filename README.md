@@ -1,5 +1,7 @@
 # SILENTARMY
 
+Official site: https://github.com/mbevand/silentarmy
+
 SILENTARMY is a [Zcash](https://z.cash) miner for Linux written in OpenCL with
 multi-GPU support. The
 [Stratum](https://github.com/str4d/zips/blob/77-zip-stratum/drafts/str4d-stratum/draft1.rst) protocol is implemented for connecting to mining pools. It runs

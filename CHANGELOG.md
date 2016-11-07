@@ -1,5 +1,6 @@
 # Current tip
 
+* Add nicehash compatibility (stratum servers fixing 17 bytes of the nonce)
 * Add nerdralph's optimization (OPTIM_FOR_FGLRX)
 * Drop the libsodium dependency; instead use our own SHA256 implementation
 * Only apply set_target to *next* mining job

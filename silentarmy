@@ -388,9 +388,9 @@ class Silentarmy:
         self.nonce_leftpart = bytes.fromhex(n)
         l = len(self.nonce_leftpart)
         very_verbose('Stratum server fixes %d bytes of the nonce' % l)
-        if l > 16:
-            # SILENTARMY requires the last 12 bytes to be zero, then 4 bytes
-            # to vary the nonce, this leaves at most 16 bytes that can be
+        if l > 17:
+            # SILENTARMY requires the last 12 bytes to be zero, then 3 bytes
+            # to vary the nonce, this leaves at most 17 bytes that can be
             # fixed by the server.
             fatal('Stratum: SILENTARMY is not compatible with servers ' +
                     'fixing the first %d bytes of the nonce' % l)
