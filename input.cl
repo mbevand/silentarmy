@@ -508,7 +508,8 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
     ushort		collisions[NR_SLOTS * 3];
     uint                nr_coll = 0;
     uint                n;
-    uint                dropped_coll, dropped_stor;
+    uint		dropped_coll = 0;
+    uint		dropped_stor = 0;
     __global ulong      *a, *b;
     uint		xi_offset;
     // read first words of Xi from the previous (round - 1) hash table
@@ -528,14 +529,18 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
     p = (ht_src + tid * NR_SLOTS * SLOT_LEN);
     cnt = *(__global uint *)p;
     cnt = min(cnt, (uint)NR_SLOTS); // handle possible overflow in prev. round
+    if (!cnt)
+	// no elements in row, no collisions
+	return ;
+#if NR_ROWS_LOG != 20 || !OPTIM_FOR_FGLRX
     p += xi_offset;
     for (i = 0; i < cnt; i++, p += SLOT_LEN)
         first_words[i] = *(__global uchar *)p;
+#endif
     // find collisions
-    nr_coll = 0;
-    dropped_coll = 0;
     for (i = 0; i < cnt; i++)
         for (j = i + 1; j < cnt; j++)
+#if NR_ROWS_LOG != 20 || !OPTIM_FOR_FGLRX
             if ((first_words[i] & mask) ==
 		    (first_words[j] & mask))
               {
@@ -552,11 +557,13 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
 #endif
               }
     // XOR colliding pairs of Xi
-    dropped_stor = 0;
     for (n = 0; n < nr_coll; n++)
       {
         i = collisions[n] & 0xff;
         j = collisions[n] >> 8;
+#else
+      {
+#endif
         a = (__global ulong *)
             (ht_src + tid * NR_SLOTS * SLOT_LEN + i * SLOT_LEN + xi_offset);
         b = (__global ulong *)

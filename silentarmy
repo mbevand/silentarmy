@@ -337,13 +337,13 @@ class Silentarmy:
                     *decoded[1:]))
             elif decoded[0] == 'status':
                 (nr_sols, nr_shares) = decoded[1:]
-                verbose('Solver %s: since starting, found %d sols %d shares' %
+                very_verbose('Solver %s: found %d sols %d shares so far' %
                         (devid, nr_sols, nr_shares))
                 self.total_sols[devid] = nr_sols
                 self.total_shares[devid] = nr_shares
             elif decoded[0] == 'msg':
                 (msg,) = decoded[1:]
-                verbose('Solver %s: reported: %s' % (devid, msg))
+                very_verbose('Solver %s: reported: %s' % (devid, msg))
             else:
                 fatal('Invalid solver line: %s' % repr(decoded))
 
@@ -388,9 +388,9 @@ class Silentarmy:
         self.nonce_leftpart = bytes.fromhex(n)
         l = len(self.nonce_leftpart)
         very_verbose('Stratum server fixes %d bytes of the nonce' % l)
-        if l > 16:
-            # SILENTARMY requires the last 12 bytes to be zero, then 4 bytes
-            # to vary the nonce, this leaves at most 16 bytes that can be
+        if l > 17:
+            # SILENTARMY requires the last 12 bytes to be zero, then 3 bytes
+            # to vary the nonce, this leaves at most 17 bytes that can be
             # fixed by the server.
             fatal('Stratum: SILENTARMY is not compatible with servers ' +
                     'fixing the first %d bytes of the nonce' % l)
@@ -465,7 +465,10 @@ class Silentarmy:
                     print("Stratum server returned an error: %s" % msg['error'])
                     return
                 if msg['id'] != self.st_expected_id:
-                    verbose("Stratum server returned wrong id: %s" % msg['id'])
+                    # XXX need to track which outstanding IDs we are waiting
+                    # a response for
+                    very_verbose("Stratum server returned wrong id: %s" % \
+                            msg['id'])
                     # attempt to proceed and ignore this error
                 self.st_expected_id = None
                 if self.st_state == 'SENT_SUBSCRIBE':
@@ -481,7 +484,7 @@ class Silentarmy:
                     self.update_mining_job()
                 elif self.st_state == 'AUTHORIZED':
                     # result: succeeded
-                    verbose("Stratum server accepted a share")
+                    very_verbose("Stratum server accepted a share")
                     self.st_accepted += 1
                 else:
                     fatal('Bug: unknown state %s' % self.st_state)

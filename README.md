@@ -1,5 +1,7 @@
 # SILENTARMY
 
+Official site: https://github.com/mbevand/silentarmy
+
 SILENTARMY is a [Zcash](https://z.cash) miner for Linux written in OpenCL with
 multi-GPU support. The
 [Stratum](https://github.com/str4d/zips/blob/77-zip-stratum/drafts/str4d-stratum/draft1.rst) protocol is implemented for connecting to mining pools. It runs
@@ -102,8 +104,14 @@ Troubleshooting performance issues:
   all the GPUs in the `--use` option, for example `silentarmy --use 0,1,2`
   if the host has three devices with IDs 0, 1, and 2.
 * If some GPUs have less than ~2.4 GB of GPU memory, run
-  `silentarmy --instances 1 --use ...` (2 instances use ~2.4 GB of GPU memory,
+  `silentarmy --instances 1` (2 instances use ~2.4 GB of GPU memory,
   1 instance uses ~1.2 GB of GPU memory.)
+* If you are using an AMD GPU with the **Radeon Software Crimson Edition**
+  driver, as opposed to the **AMDGPU-PRO** driver, then edit param.h and set
+  `OPTIM_FOR_FGLRX` to 1. This will improve performance by +5% and reduce
+  GPU memory usage from 1.2 GB per instance to 805 MB per instance. But do
+  **not** set it if you are using the AMDGPU-PRO driver or else it will
+  degrade performance by -15% or more.
 * If 1 instance still requires too much memory, edit `param.h` and set
   `NR_ROWS_LOG` to `19` (this reduces the per-instance memory usage to ~670 MB)
   and run with `--instances 1`.
@@ -248,6 +256,12 @@ supports Equihash parameters 200,9.
 Marc Bevand -- [http://zorinaq.com](http://zorinaq.com)
 
 Donations welcome: t1cVviFvgJinQ4w3C2m2CfRxgP5DnHYaoFC
+
+# Thanks
+
+I would like to thank these persons for their contributions to SILENTARMY,
+in alphabetical order:
+* nerdralph
 
 # License
 
