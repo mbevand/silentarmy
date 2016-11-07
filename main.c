@@ -1043,7 +1043,7 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
     char		line[4096];
     uint8_t		target[SHA256_DIGEST_SIZE];
     char		job_id[256];
-    size_t		fixed_nonce_bytes;
+    size_t		fixed_nonce_bytes = 0;
     uint64_t		i;
     uint64_t		total = 0;
     uint32_t		shares;
