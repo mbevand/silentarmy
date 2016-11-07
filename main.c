@@ -1116,6 +1116,7 @@ void run_opencl(uint8_t *header, size_t header_len, cl_context ctx,
     if (dbg)
         free(dbg);
     clReleaseMemObject(buf_dbg);
+    clReleaseMemObject(buf_sols);
     clReleaseMemObject(buf_ht[0]);
     clReleaseMemObject(buf_ht[1]);
 }
@@ -1278,6 +1279,7 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
     status |= clReleaseKernel(k_init_ht);
     for (unsigned round = 0; round < PARAM_K; round++)
 	status |= clReleaseKernel(k_rounds[round]);
+    status |= clReleaseKernel(k_sols);
     status |= clReleaseProgram(program);
     status |= clReleaseCommandQueue(queue);
     status |= clReleaseContext(context);
