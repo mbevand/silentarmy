@@ -853,8 +853,12 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
 	memset(nonce_ptr, 0, ZCASH_NONCE_LEN);
     // add the nonce
     if (mining)
-	// increment bytes 16-19
-	*(uint32_t *)((uint8_t *)nonce_ptr + 16) += nonce;
+      {
+	// increment bytes 17-19
+	*(uint32_t *)((uint8_t *)nonce_ptr + 17) += nonce;
+	// byte 20 and above must be zero
+	*(uint32_t *)((uint8_t *)nonce_ptr + 20) = 0;
+      }
     else
 	*nonce_ptr += nonce;
     debug("\nSolving nonce %s\n", s_hexdump(nonce_ptr, ZCASH_NONCE_LEN));
