@@ -1,23 +1,26 @@
+#EDiting for OSX
 # Change this path if the SDK was installed in a non-standard location
-OPENCL_HEADERS = "/opt/AMDAPPSDK-3.0/include"
+OPENCL_HEADERS = "/System/Library/Frameworks/OpenCL.framework/Headers/"
 # By default libOpenCL.so is searched in default system locations, this path
 # lets you adds one more directory to the search path.
-LIBOPENCL = "/opt/amdgpu-pro/lib/x86_64-linux-gnu"
+LIBOPENCL = "/System/Library/Frameworks/OpenCL.framework/Versions/Current/Libraries"
 
-CC = gcc
+CC = gcc-6
 CPPFLAGS = -std=gnu99 -pedantic -Wextra -Wall -ggdb \
     -Wno-deprecated-declarations \
     -Wno-overlength-strings \
-    -I${OPENCL_HEADERS}
+		-I${OPENCL_HEADERS} \
+		-framework OpenCL
+
 LDFLAGS = -rdynamic -L${LIBOPENCL}
-LDLIBS = -lOpenCL
+#LDLIBS = -lOpenCL
 OBJ = main.o blake.o sha256.o
 INCLUDES = blake.h param.h _kernel.h sha256.h
 
 all : sa-solver
 
 sa-solver : ${OBJ}
-	${CC} -o sa-solver ${OBJ} ${LDFLAGS} ${LDLIBS}
+	${CC} -o sa-solver ${OBJ} ${LDFLAGS} ${LDLIBS} ${CPPFLAGS}
 
 ${OBJ} : ${INCLUDES}
 

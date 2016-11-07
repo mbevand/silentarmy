@@ -1,4 +1,4 @@
-#define _GNU_SOURCE	1/* memrchr */
+#define _GNU_SOURCE	1/* memrchr not available on osx*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -12,7 +12,8 @@
 #include <unistd.h>
 #include <getopt.h>
 #include <errno.h>
-#include <CL/cl.h>
+/*#include <CL/cl.h>*/
+#include <OpenCL/OpenCL.h>
 #include "blake.h"
 #include "_kernel.h"
 #include "sha256.h"
@@ -929,6 +930,25 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
 **
 ** Return 1 iff a line was read.
 */
+
+void *
+memrchr(s, c, n)
+    const void *s;
+    int c;
+    size_t n;
+{
+    const unsigned char *cp;
+
+    if (n != 0) {
+	cp = (unsigned char *)s + n;
+	do {
+	    if (*(--cp) == (unsigned char)c)
+		return (void *)cp;
+	} while (--n != 0);
+    }
+    return (void *)0;
+}
+
 int read_last_line(char *buf, size_t len, int block)
 {
     char	*start;
