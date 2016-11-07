@@ -844,23 +844,37 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
     size_t              local_work_size = 64;
     uint32_t		sol_found = 0;
     uint64_t		*nonce_ptr;
-    assert(header_len == ZCASH_BLOCK_HEADER_LEN ||
-	    header_len == ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN);
     if (mining)
+      {
+	// mining mode must specify full header
+	assert(header_len == ZCASH_BLOCK_HEADER_LEN);
 	assert(target && job_id);
+      }
+    else
+	assert(header_len == ZCASH_BLOCK_HEADER_LEN ||
+		header_len == ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN);
     nonce_ptr = (uint64_t *)(header + ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN);
-    if (header_len == ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN)
-	memset(nonce_ptr, 0, ZCASH_NONCE_LEN);
-    // add the nonce
+    // add the nonce. if (header_len == ZCASH_BLOCK_HEADER_LEN) the full
+    // header is preserved between calls to solve_equihash(), so we can just
+    // increment by 1, else 'nonce' is used to construct the 32-byte nonce.
     if (mining)
       {
 	// increment bytes 17-19
-	*(uint32_t *)((uint8_t *)nonce_ptr + 17) += nonce;
+	(*(uint32_t *)((uint8_t *)nonce_ptr + 17))++;
 	// byte 20 and above must be zero
 	*(uint32_t *)((uint8_t *)nonce_ptr + 20) = 0;
       }
     else
-	*nonce_ptr += nonce;
+      {
+	if (header_len == ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN)
+	  {
+	    memset(nonce_ptr, 0, ZCASH_NONCE_LEN);
+	    // add the nonce
+	    *nonce_ptr += nonce;
+	  }
+	else
+	    (*nonce_ptr)++;
+      }
     debug("\nSolving nonce %s\n", s_hexdump(nonce_ptr, ZCASH_NONCE_LEN));
     // Process first BLAKE2b-400 block
     zcash_blake2b_init(&blake, ZCASH_HASH_LEN, PARAM_N, PARAM_K);
