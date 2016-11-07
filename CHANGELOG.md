@@ -1,8 +1,9 @@
 # Current tip
 
-* Add nicehash compatibility (stratum servers fixing 17 bytes of the nonce)
 * Add nerdralph's optimization (OPTIM_FOR_FGLRX)
+* Drop the Python 3.5 dependency; now requires only Python 3.3 or above (lhl)
 * Drop the libsodium dependency; instead use our own SHA256 implementation
+* Add nicehash compatibility (stratum servers fixing 17 bytes of the nonce)
 * Only apply set_target to *next* mining job
 * Do not abandon previous mining jobs if clean_jobs is false
 * Fix KeyError's when displaying stats

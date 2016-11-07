@@ -9,8 +9,16 @@ import struct
 import json
 import binascii
 import re
-import asyncio
 import logging
+
+try:
+    import asyncio
+except ImportError as e:
+    # system doesn't provide asyncio module (eg. Python 3.3),
+    # so use module bundled with silentarmy
+    p = os.path.join(sys.path[0], 'thirdparty', 'asyncio')
+    sys.path.insert(1, p) # make it the 2nd path
+    import asyncio
 
 verbose_level = 0
 
@@ -33,6 +41,11 @@ def verbose(msg):
 def very_verbose(msg):
     if verbose_level > 1:
         print(msg)
+
+def my_ensure_future(coro):
+    loop = asyncio.get_event_loop()
+    task = loop.create_task(coro)
+    return task
 
 def parse_url(url):
     '''Return (host, port) from "stratum+tcp://host:port"'''
@@ -108,7 +121,7 @@ class StratumClientProtocol(asyncio.Protocol):
             print('Stratum: connection was closed (invalid user/pwd?)')
         else:
             print('Stratum: lost connection: %s' % exc)
-        asyncio.ensure_future(self.sa.reconnect())
+        my_ensure_future(self.sa.reconnect())
 
     #
     # other methods
@@ -184,7 +197,7 @@ class Silentarmy:
             yield from coro
         except Exception as e:
             print("Stratum: error connecting: %s" % e)
-            asyncio.ensure_future(self.reconnect())
+            my_ensure_future(self.reconnect())
 
     @asyncio.coroutine
     def show_stats(self):
@@ -259,17 +272,12 @@ class Silentarmy:
         if self.opts.do_list:
             self.list_devices()
         self.init()
-        try:
-            asyncio.ensure_future(self.reconnect())
-        except AttributeError as e:
-            fatal(('Error calling ensure_future(): %s\n' % e) +
-                    'Please update to Python 3.4.5 (or above) - see ' +
-                    'https://github.com/mbevand/silentarmy/issues/8')
-        asyncio.ensure_future(self.show_stats())
+        my_ensure_future(self.reconnect())
+        my_ensure_future(self.show_stats())
         for gpuid in self.opts.use:
             for instid in range(self.opts.instances):
                 devid = "%d.%d" % (gpuid, instid)
-                asyncio.ensure_future(self.start_solvers(devid))
+                my_ensure_future(self.start_solvers(devid))
         try:
             self.loop.run_forever()
         except KeyboardInterrupt as e:
@@ -369,7 +377,7 @@ class Silentarmy:
                 if devid not in self.solver_procs:
                     # happens if solver crashed
                     print('Solver %s: not running, relaunching it' % devid)
-                    asyncio.ensure_future(self.start_solvers(devid))
+                    my_ensure_future(self.start_solvers(devid))
                     # TODO: ideally the mining job should be sent to the solver
                     # as soon as it is back up and running
         if not self.st_had_job:

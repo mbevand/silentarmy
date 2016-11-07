@@ -6,4 +6,5 @@
 _temp_*
 *.swp
 *.tmp
+*.pyc
 tags

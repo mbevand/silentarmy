@@ -1,0 +1,30 @@
+"asyncio" is a clone of https://github.com/python/asyncio as of revision
+07ac834068037d8206d6c941e029474bda8e08f2 (03 Nov 2016) with the following
+patch:
+
+--- asyncio/base_events.py	2016-11-07 16:45:34.587238061 -0600
++++ asyncio/base_events.py	2016-11-07 14:50:34.169035083 -0600
+@@ -40,6 +40,11 @@
+ 
+ __all__ = ['BaseEventLoop']
+ 
++# lhl: We need to add this back in because 3.3 doesn't have a default max_workers in ThreadPoolExecuter
++# https://bugs.python.org/issue26796
++# https://docs.python.org/3/library/asyncio-eventloop.html#executor 
++# https://docs.python.org/3/library/concurrent.futures.html
++_MAX_WORKERS=8
+ 
+ # Minimum number of _scheduled timer handles before cleanup of
+ # cancelled handles is performed.
+@@ -619,7 +624,10 @@
+         if executor is None:
+             executor = self._default_executor
+             if executor is None:
+-                executor = concurrent.futures.ThreadPoolExecutor()
++                try:
++                    executor = concurrent.futures.ThreadPoolExecutor()
++                except:
++                    executor = concurrent.futures.ThreadPoolExecutor(_MAX_WORKERS)
+                 self._default_executor = executor
+         return futures.wrap_future(executor.submit(func, *args), loop=self)
+ 

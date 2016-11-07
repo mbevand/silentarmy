@@ -121,14 +121,12 @@ Troubleshooting performance issues:
 SILENTARMY has primarily been tested with AMD GPUs on 64-bit Linux with
 the **AMDGPU-PRO** driver (amdgpu.ko, for newer GPUs) and the **Radeon Software
 Crimson Edition** driver (fglrx.ko, for older GPUs). Its only build
-dependency is an OpenCL implementation.
+dependency is an OpenCL implementation. And its only runtime dependency is
+Python 3.3+ (which supports SILENTARMY's use of the "yield from" syntax.)
 
 Installation of the drivers and SDK can be error-prone, so below are
 step-by-step instructions for the AMD OpenCL implementation (**AMD APP SDK**),
-for Ubuntu 16.04 as well as Ubuntu 14.04 (beware: the `silentarmy` miner makes
-use of Python's `ensure_future()` which requires Python 3.4.4, however Ubuntu
-14.04 ships 3.4.3, therefore only the `sa-solver` tool is usable on Ubuntu
-14.04.)
+for Ubuntu 16.04 as well as Ubuntu 14.04.
 
 ## Ubuntu 16.04
 
@@ -261,6 +259,7 @@ Donations welcome: t1cVviFvgJinQ4w3C2m2CfRxgP5DnHYaoFC
 
 I would like to thank these persons for their contributions to SILENTARMY,
 in alphabetical order:
+* lhl
 * nerdralph
 
 # License
