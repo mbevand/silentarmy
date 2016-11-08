@@ -557,7 +557,7 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
     if (!cnt)
 	// no elements in row, no collisions
 	return ;
-#if NR_ROWS_LOG != 20 || !OPTIM_FOR_FGLRX
+#if NR_ROWS_LOG != 20 || !OPTIM_SIMPLIFY_ROUND
     p += xi_offset;
     for (i = 0; i < cnt; i++, p += SLOT_LEN)
         first_words[i] = *(__global uchar *)p;
@@ -565,7 +565,7 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
     // find collisions
     for (i = 0; i < cnt; i++)
         for (j = i + 1; j < cnt; j++)
-#if NR_ROWS_LOG != 20 || !OPTIM_FOR_FGLRX
+#if NR_ROWS_LOG != 20 || !OPTIM_SIMPLIFY_ROUND
             if ((first_words[i] & mask) ==
 		    (first_words[j] & mask))
               {

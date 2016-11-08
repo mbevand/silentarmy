@@ -106,7 +106,7 @@ Troubleshooting performance issues:
   1 instance uses ~1.2 GB of GPU memory.)
 * If you are using an AMD GPU with the **Radeon Software Crimson Edition**
   driver, as opposed to the **AMDGPU-PRO** driver, then edit param.h and set
-  `OPTIM_FOR_FGLRX` to 1. This will improve performance by +5% and reduce
+  `OPTIM_SIMPLIFY_ROUND` to 1. This will improve performance by +5% and reduce
   GPU memory usage from 1.2 GB per instance to 805 MB per instance. But do
   **not** set it if you are using the AMDGPU-PRO driver or else it will
   degrade performance by -15% or more.

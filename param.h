@@ -10,7 +10,7 @@
 
 // Set this to 1 if you are using an AMD GPU with the Radeon Software Crimson
 // Edition driver (fglrx.ko), see README.md.
-#define OPTIM_FOR_FGLRX			0
+#define OPTIM_SIMPLIFY_ROUND			0
 
 // Make hash tables OVERHEAD times larger than necessary to store the average
 // number of elements per row. The ideal value is as small as possible to
@@ -29,7 +29,7 @@
 #define OVERHEAD                        3
 #elif NR_ROWS_LOG == 19
 #define OVERHEAD                        5
-#elif NR_ROWS_LOG == 20 && OPTIM_FOR_FGLRX
+#elif NR_ROWS_LOG == 20 && OPTIM_SIMPLIFY_ROUND
 #define OVERHEAD                        6
 #elif NR_ROWS_LOG == 20
 #define OVERHEAD                        9
