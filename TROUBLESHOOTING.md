@@ -62,6 +62,8 @@ Nonce 0100000000000000000000000000000000000000000000000000000000000000: 0 sols
 ...
 ```
 
+It should not crash or hang.
+
 ## Mining
 
 Run the miner without options. By default it will use the first device,
@@ -69,14 +71,17 @@ and connect to flypool with my donation address. These known-good parameters
 should let you know easily if your machine can mine properly:
 
 ```
+$ ./silentarmy
 Connecting to us1-zcash.flypool.org:3333
 Stratum server sent us the first job
 Mining on 1 device
 Total 0.0 sol/s [dev0 0.0] 0 shares
-Total 48.9 sol/s [dev0 48.9] 0 shares
-Total 44.9 sol/s [dev0 44.9] 0 shares
+Total 48.9 sol/s [dev0 48.9] 1 share
+Total 44.9 sol/s [dev0 44.9] 1 share
 ...
 ```
+
+Verify that the number of shares increases over time.
 
 ## Performance
 
