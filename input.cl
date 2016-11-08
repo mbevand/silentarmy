@@ -227,7 +227,7 @@ void kernel_round0(__global ulong *blake_state, __global char *ht,
         // mix in length of data
         v[12] ^= ZCASH_BLOCK_HEADER_LEN + 4 /* length of "i" */;
         // last block
-        v[14] ^= -1;
+        v[14] ^= (ulong)-1;
 
         // round 1
         mix(v[0], v[4], v[8],  v[12], 0, word1);
