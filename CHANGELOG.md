@@ -1,4 +1,4 @@
-# Current tip
+# Version 4 (08 Nov 2016)
 
 * Add Nvidia GPU support (fix more unaligned memory accesses)
 * Add nerdralph's optimization for potential +10% speedup (OPTIM_SIMPLIFY_ROUND)
