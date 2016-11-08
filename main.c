@@ -11,9 +11,9 @@
 
 
 #include <errno.h>
-
 #include <CL/cl.h>
 #include "blake.h"
+#include "sha256.h"
 
 #ifdef WIN32
 
@@ -22,13 +22,12 @@
 #include <Winsock2.h>
 #include <io.h>
 #include <BaseTsd.h>
-#include "silentarmy_win/gettimeofday.h"
-#include "silentarmy_win/getopt.h"
-#include "silentarmy_win/memrchr.h"
+#include "windows/gettimeofday.h"
+#include "windows/getopt.h"
+#include "windows/memrchr.h"
 
 typedef SSIZE_T ssize_t;
 
-#define SODIUM_STATIC
 
 #define open _open
 #define read _read
@@ -42,10 +41,8 @@ typedef SSIZE_T ssize_t;
 #include <unistd.h>
 #include <getopt.h>
 #include "_kernel.h"
+
 #endif
-
-#include <sodium.h>
-
 
 typedef uint8_t		uchar;
 typedef uint32_t	uint;
@@ -662,8 +659,8 @@ uint32_t print_solver_line(uint32_t *values, uint8_t *header,
 {
     uint8_t	buffer[ZCASH_BLOCK_HEADER_LEN + ZCASH_SOLSIZE_LEN +
 	ZCASH_SOL_LEN];
-    uint8_t	hash0[crypto_hash_sha256_BYTES];
-    uint8_t	hash1[crypto_hash_sha256_BYTES];
+    uint8_t	hash0[SHA256_DIGEST_SIZE];
+    uint8_t	hash1[SHA256_DIGEST_SIZE];
     uint8_t	*p;
     p = buffer;
     memcpy(p, header, ZCASH_BLOCK_HEADER_LEN);
@@ -671,8 +668,8 @@ uint32_t print_solver_line(uint32_t *values, uint8_t *header,
     memcpy(p, "\xfd\x40\x05", ZCASH_SOLSIZE_LEN);
     p += ZCASH_SOLSIZE_LEN;
     store_encoded_sol(p, values, 1 << PARAM_K);
-    crypto_hash_sha256(hash0, buffer, sizeof (buffer));
-    crypto_hash_sha256(hash1, hash0, sizeof (hash0));
+    Sha256_Onestep(buffer, sizeof (buffer), hash0);
+    Sha256_Onestep(hash0, sizeof (hash0), hash1);
     // compare the double SHA256 hash with the target
     if (cmp_target_256(target, hash1) < 0)
       {
@@ -886,19 +883,37 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
     size_t              local_work_size = 64;
     uint32_t		sol_found = 0;
     uint64_t		*nonce_ptr;
-    assert(header_len == ZCASH_BLOCK_HEADER_LEN ||
-	    header_len == ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN);
     if (mining)
+      {
+	// mining mode must specify full header
+	assert(header_len == ZCASH_BLOCK_HEADER_LEN);
 	assert(target && job_id);
-    nonce_ptr = (uint64_t *)(header + ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN);
-    if (header_len == ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN)
-	memset(nonce_ptr, 0, ZCASH_NONCE_LEN);
-    // add the nonce
-    if (mining)
-	// increment bytes 16-19
-	*(uint32_t *)((uint8_t *)nonce_ptr + 16) += nonce;
+      }
     else
-	*nonce_ptr += nonce;
+	assert(header_len == ZCASH_BLOCK_HEADER_LEN ||
+		header_len == ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN);
+    nonce_ptr = (uint64_t *)(header + ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN);
+    // add the nonce. if (header_len == ZCASH_BLOCK_HEADER_LEN) the full
+    // header is preserved between calls to solve_equihash(), so we can just
+    // increment by 1, else 'nonce' is used to construct the 32-byte nonce.
+    if (mining)
+      {
+	// increment bytes 17-19
+	(*(uint32_t *)((uint8_t *)nonce_ptr + 17))++;
+	// byte 20 and above must be zero
+	*(uint32_t *)((uint8_t *)nonce_ptr + 20) = 0;
+      }
+    else
+      {
+	if (header_len == ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN)
+	  {
+	    memset(nonce_ptr, 0, ZCASH_NONCE_LEN);
+	    // add the nonce
+	    *nonce_ptr += nonce;
+	  }
+	else
+	    (*nonce_ptr)++;
+      }
     debug("\nSolving nonce %s\n", s_hexdump(nonce_ptr, ZCASH_NONCE_LEN));
     // Process first BLAKE2b-400 block
     zcash_blake2b_init(&blake, ZCASH_HASH_LEN, PARAM_N, PARAM_K);
@@ -1082,9 +1097,9 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
 	uint8_t *header)
 {
     char		line[4096];
-    uint8_t		target[32];
+    uint8_t		target[SHA256_DIGEST_SIZE];
     char		job_id[256];
-    size_t		fixed_nonce_bytes;
+    size_t		fixed_nonce_bytes = 0;
     uint64_t		i;
     uint64_t		total = 0;
     uint32_t		shares;
@@ -1161,6 +1176,7 @@ void run_opencl(uint8_t *header, size_t header_len, cl_context ctx,
     if (dbg)
         free(dbg);
     clReleaseMemObject(buf_dbg);
+    clReleaseMemObject(buf_sols);
     clReleaseMemObject(buf_ht[0]);
     clReleaseMemObject(buf_ht[1]);
 }
@@ -1326,6 +1342,7 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
     status |= clReleaseKernel(k_init_ht);
     for (unsigned round = 0; round < PARAM_K; round++)
 	status |= clReleaseKernel(k_rounds[round]);
+    status |= clReleaseKernel(k_sols);
     status |= clReleaseProgram(program);
     status |= clReleaseCommandQueue(queue);
     status |= clReleaseContext(context);
@@ -1473,7 +1490,6 @@ int main(int argc, char **argv)
                 fatal("Try '%s --help'\n", argv[0]);
                 break ;
           }
-	mining = 1;
     tests();
     header_len = parse_header(header, sizeof (header), hex_header);
     init_and_run_opencl(header, header_len);

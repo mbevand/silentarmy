@@ -1,6 +1,15 @@
-# Current tip
+# Version 4 (08 Nov 2016)
 
+* Add Nvidia GPU support (fix more unaligned memory accesses)
+* Add nerdralph's optimization for potential +10% speedup (OPTIM_SIMPLIFY_ROUND)
+* Drop the Python 3.5 dependency; now requires only Python 3.3 or above (lhl)
+* Drop the libsodium dependency; instead use our own SHA256 implementation
+* Add nicehash compatibility (stratum servers fixing 17 bytes of the nonce)
+* Only apply set_target to *next* mining job
+* Do not abandon previous mining jobs if clean_jobs is false
 * Fix KeyError's when displaying stats
+* Be more robust about different types of network errors during connection
+* Remove bytes.hex() which was only supported on Python 3.5+.
 
 # Version 3 (04 Nov 2016)
 

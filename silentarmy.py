@@ -7,11 +7,25 @@ import time
 import socket
 import struct
 import json
+import binascii
 import re
-import asyncio
 import logging
 
+try:
+    import asyncio
+except ImportError as e:
+    # system doesn't provide asyncio module (eg. Python 3.3),
+    # so use module bundled with silentarmy
+    p = os.path.join(sys.path[0], 'thirdparty', 'asyncio')
+    sys.path.insert(1, p) # make it the 2nd path
+    import asyncio
+
 verbose_level = 0
+
+def b2hex(b):
+    '''Convert a bytes object to a hex string.'''
+    # This is equivalent to bytes.hex() in Python 3.5.
+    return binascii.hexlify(b).decode('ascii')
 
 def warn(msg):
     sys.stderr.write(msg + '\n')
@@ -27,6 +41,11 @@ def verbose(msg):
 def very_verbose(msg):
     if verbose_level > 1:
         print(msg)
+
+def my_ensure_future(coro):
+    loop = asyncio.get_event_loop()
+    task = loop.create_task(coro)
+    return task
 
 def parse_url(url):
     '''Return (host, port) from "stratum+tcp://host:port"'''
@@ -102,7 +121,7 @@ class StratumClientProtocol(asyncio.Protocol):
             print('Stratum: connection was closed (invalid user/pwd?)')
         else:
             print('Stratum: lost connection: %s' % exc)
-        asyncio.ensure_future(self.sa.reconnect())
+        my_ensure_future(self.sa.reconnect())
 
     #
     # other methods
@@ -178,7 +197,7 @@ class Silentarmy:
             yield from coro
         except Exception as e:
             print("Stratum: error connecting: %s" % e)
-            asyncio.ensure_future(self.reconnect())
+            my_ensure_future(self.reconnect())
 
     @asyncio.coroutine
     def show_stats(self):
@@ -253,12 +272,12 @@ class Silentarmy:
         if self.opts.do_list:
             self.list_devices()
         self.init()
-        asyncio.ensure_future(self.reconnect())
-        asyncio.ensure_future(self.show_stats())
+        my_ensure_future(self.reconnect())
+        my_ensure_future(self.show_stats())
         for gpuid in self.opts.use:
             for instid in range(self.opts.instances):
                 devid = "%d.%d" % (gpuid, instid)
-                asyncio.ensure_future(self.start_solvers(devid))
+                my_ensure_future(self.start_solvers(devid))
         try:
             self.loop.run_forever()
         except KeyboardInterrupt as e:
@@ -327,13 +346,13 @@ class Silentarmy:
                     *decoded[1:]))
             elif decoded[0] == 'status':
                 (nr_sols, nr_shares) = decoded[1:]
-                verbose('Solver %s: since starting, found %d sols %d shares' %
+                very_verbose('Solver %s: found %d sols %d shares so far' %
                         (devid, nr_sols, nr_shares))
                 self.total_sols[devid] = nr_sols
                 self.total_shares[devid] = nr_shares
             elif decoded[0] == 'msg':
                 (msg,) = decoded[1:]
-                verbose('Solver %s: reported: %s' % (devid, msg))
+                very_verbose('Solver %s: reported: %s' % (devid, msg))
             else:
                 fatal('Invalid solver line: %s' % repr(decoded))
 
@@ -359,7 +378,7 @@ class Silentarmy:
                 if devid not in self.solver_procs:
                     # happens if solver crashed
                     print('Solver %s: not running, relaunching it' % devid)
-                    asyncio.ensure_future(self.start_solvers(devid))
+                    my_ensure_future(self.start_solvers(devid))
                     # TODO: ideally the mining job should be sent to the solver
                     # as soon as it is back up and running
         if not self.st_had_job:
@@ -367,9 +386,9 @@ class Silentarmy:
             l = len(self.opts.use)
             print('Mining on %d device%s' % (l, '' if l == 1 else 's'))
             self.st_had_job = True
-        job = "%s %s %s %s\n" % (bytes.hex(self.target), self.job_id,
-                bytes.hex(self.zcash_nonceless_header),
-                bytes.hex(self.nonce_leftpart))
+        job = "%s %s %s %s\n" % (b2hex(self.target), self.job_id,
+                b2hex(self.zcash_nonceless_header),
+                b2hex(self.nonce_leftpart))
         very_verbose('To solvers: %s' % job.rstrip())
         for devid in self.solver_procs:
             self.solver_procs[devid].stdin.write(job.encode('utf8'))
@@ -378,9 +397,9 @@ class Silentarmy:
         self.nonce_leftpart = bytes.fromhex(n)
         l = len(self.nonce_leftpart)
         very_verbose('Stratum server fixes %d bytes of the nonce' % l)
-        if l > 16:
-            # SILENTARMY requires the last 12 bytes to be zero, then 4 bytes
-            # to vary the nonce, this leaves at most 16 bytes that can be
+        if l > 17:
+            # SILENTARMY requires the last 12 bytes to be zero, then 3 bytes
+            # to vary the nonce, this leaves at most 17 bytes that can be
             # fixed by the server.
             fatal('Stratum: SILENTARMY is not compatible with servers ' +
                     'fixing the first %d bytes of the nonce' % l)
@@ -389,16 +408,21 @@ class Silentarmy:
         verbose('Received target %s' % t)
         if not re.match(r'^[0-9a-fA-F]{64}$', t):
             raise Exception('Invalid target: %s' % t)
+        is_first_target = self.target is None
         # store it in internal byte order
         self.target = bytes.fromhex(t)[::-1]
-        l = len(self.target)
-        if l != 32:
-            fatal('Stratum: server returned an invalid %d-byte target' % l)
+        # take the target into account *immediately* only if it is the first
+        # ever received, or else the target applies to the next job
+        if is_first_target:
+            self.update_mining_job()
 
     def set_new_job(self, job_id, nversion, hash_prev_block, hash_merkle_root,
             hash_reserved, ntime, nbits, clean_jobs):
-        self.job_id = job_id
         verbose('Received job "%s"' % job_id)
+        if not clean_jobs:
+            verbose('Ignoring job "%s" (clean_jobs=False)' % job_id)
+            return
+        self.job_id = job_id
         if nversion != '04000000':
             raise Exception('Invalid version: %s' % nversion)
         if not re.match(r'^[0-9a-fA-F]{64}$', hash_prev_block):
@@ -450,7 +474,10 @@ class Silentarmy:
                     print("Stratum server returned an error: %s" % msg['error'])
                     return
                 if msg['id'] != self.st_expected_id:
-                    verbose("Stratum server returned wrong id: %s" % msg['id'])
+                    # XXX need to track which outstanding IDs we are waiting
+                    # a response for
+                    very_verbose("Stratum server returned wrong id: %s" % \
+                            msg['id'])
                     # attempt to proceed and ignore this error
                 self.st_expected_id = None
                 if self.st_state == 'SENT_SUBSCRIBE':
@@ -466,7 +493,7 @@ class Silentarmy:
                     self.update_mining_job()
                 elif self.st_state == 'AUTHORIZED':
                     # result: succeeded
-                    verbose("Stratum server accepted a share")
+                    very_verbose("Stratum server accepted a share")
                     self.st_accepted += 1
                 else:
                     fatal('Bug: unknown state %s' % self.st_state)
@@ -475,7 +502,6 @@ class Silentarmy:
                 if msg['method'] == 'mining.set_target':
                     # params: [ target ]
                     self.set_target(msg['params'][0])
-                    self.update_mining_job()
                 elif msg['method'] == 'mining.notify':
                     # params: [ job_id, nVersion, hashPrevBlock, hashMerkleRoot,
                     #   hashReserved, nTime, nBits, clean_jobs ]

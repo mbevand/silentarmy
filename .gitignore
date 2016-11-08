@@ -1,5 +1,15 @@
-/silentarmy_win/x64
+/windows/x64
 /sa-solver.pdb
 /sa-solver.v12.suo
 /sa-solver.exp
 /sa-solver.lib
+/.hg/
+/.hgignore
+/sa-solver
+/_kernel.h
+*.o
+_temp_*
+*.swp
+*.tmp
+*.pyc
+tags
