@@ -157,7 +157,10 @@ Instructions are provided below for a few Linux versions.
 1. Install the OpenCL development files and the latest driver:
    `$ sudo apt-get install nvidia-opencl-dev nvidia-361`
 
-2. Install compiler dependencies in order to compile SILENTARMY:
+2. Either reboot, or load the kernel driver:
+   `$ modprobe nvidia_361`
+
+3. Install compiler dependencies in order to compile SILENTARMY:
   `$ sudo apt-get install build-essential`
 
 ## Arch Linux

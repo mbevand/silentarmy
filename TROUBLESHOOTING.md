@@ -84,9 +84,10 @@ Not achieving the performance you expected?
 
 * You might want to edit the `param.h` file, look for `OPTIM_SIMPLIFY_ROUND`,
   and set it to 1 (instead of 0). Then recompile with `make`. Depending on
-  your exact drivers/hardware combination, it may boost performance by +10%,
-  or decrease it. Just try it. Also, setting `OPTIM_SIMPLIFY_ROUND` to 1 will
-  decrease GPU memory usage from 1.2 GB per instance to 805 MB per instance.
+  your exact drivers/hardware combination, it may boost performance by +25%,
+  or decrease it. Just try it. It seems especially useful on Nvidia GPUs. Also,
+  setting `OPTIM_SIMPLIFY_ROUND` to 1 will decrease GPU memory usage from
+  1.2 GB per instance to 805 MB per instance.
 * By default SILENTARMY mines with only one device/GPU; make sure to specify
   all the GPUs in the `--use` option, for example `silentarmy --use 0,1,2`
   if the host has three devices with IDs 0, 1, and 2.
