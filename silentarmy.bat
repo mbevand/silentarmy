@@ -1,0 +1,1 @@
+python silentarmy --use=0,1 -c stratum+tcp://zec.suprnova.cc:2142 -u Genoil.SilentArmy -p z
