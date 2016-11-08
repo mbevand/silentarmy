@@ -2,6 +2,7 @@
 
 * Update README.md with Nvidia performance numbers
 * Fix mining on Xeon Phi and CPUs (fix OpenCL warnings)
+* Fix compilation warnings and 32-bit platforms
 
 # Version 4 (08 Nov 2016)
 

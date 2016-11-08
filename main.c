@@ -4,6 +4,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <assert.h>
 #include <sys/types.h>
 #include <sys/time.h>
@@ -591,7 +592,7 @@ void print_sol(uint32_t *values, uint64_t *nonce)
     fprintf(stderr, "Soln:");
     // for brievity, only print "small" nonces
     if (*nonce < (1ULL << 32))
-	fprintf(stderr, " 0x%llx:", *nonce);
+	fprintf(stderr, " 0x%" PRIx64 ":", *nonce);
     for (unsigned i = 0; i < show_n_sols; i++)
 	fprintf(stderr, " %x", values[i]);
     fprintf(stderr, "%s\n", (show_n_sols != (1 << PARAM_K) ? "..." : ""));
@@ -1065,7 +1066,7 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
         if ((t1 = now()) > t0 + status_period)
           {
             t0 = t1;
-            printf("status: %lld %lld\n", total, total_shares);
+            printf("status: %" PRId64 " %" PRId64 "\n", total, total_shares);
             fflush(stdout);
           }
       }
@@ -1107,7 +1108,7 @@ void run_opencl(uint8_t *header, size_t header_len, cl_context ctx,
 		buf_sols, buf_dbg, dbg_size, header, header_len, nonce,
 		0, NULL, NULL, NULL);
     uint64_t t1 = now();
-    fprintf(stderr, "Total %lld solutions in %.1f ms (%.1f Sol/s)\n",
+    fprintf(stderr, "Total %" PRId64 " solutions in %.1f ms (%.1f Sol/s)\n",
 	    total, (t1 - t0) / 1e3, total / ((t1 - t0) / 1e6));
     // Clean up
     if (dbg)
