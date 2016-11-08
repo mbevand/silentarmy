@@ -8,8 +8,7 @@
 // but occasionally misses ~1% of solutions.
 #define NR_ROWS_LOG                     20
 
-// Set this to 1 if you are using an AMD GPU with the Radeon Software Crimson
-// Edition driver (fglrx.ko), see README.md.
+// Setting this to 1 might make SILENTARMY faster, see TROUBLESHOOTING.md
 #define OPTIM_SIMPLIFY_ROUND			0
 
 // Make hash tables OVERHEAD times larger than necessary to store the average

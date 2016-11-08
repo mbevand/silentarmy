@@ -2,11 +2,9 @@
 
 Official site: https://github.com/mbevand/silentarmy
 
-SILENTARMY is a [Zcash](https://z.cash) miner for Linux written in OpenCL with
-multi-GPU support. The
-[Stratum](https://github.com/str4d/zips/blob/77-zip-stratum/drafts/str4d-stratum/draft1.rst) protocol is implemented for connecting to mining pools. It runs
-on AMD GPUs, Nvidia GPUs, and other OpenCL devices such as Xeon Phi,
-Intel GPUs, and through OpenCL CPU drivers.
+SILENTARMY is a free open source [Zcash](https://z.cash) miner for Linux
+with multi-GPU and [Stratum](https://github.com/str4d/zips/blob/77-zip-stratum/drafts/str4d-stratum/draft1.rst) support. It is written in OpenCL and has been tested
+on AMD/Nvidia/Intel GPUs, Xeon Phi, and more.
 
 After compiling SILENTARMY, list the available OpenCL devices:
 
@@ -97,22 +95,8 @@ of the Equihash proof-of-work algorithm causing it to underperform. One must
 manually run 2 instances of `sa-solver` (eg. in 2 terminal consoles) to
 achieve the same performance level as the `silentarmy` **miner**.
 
-Troubleshooting performance issues:
-* By default SILENTARMY mines with only one device/GPU; make sure to specify
-  all the GPUs in the `--use` option, for example `silentarmy --use 0,1,2`
-  if the host has three devices with IDs 0, 1, and 2.
-* If some GPUs have less than ~2.4 GB of GPU memory, run
-  `silentarmy --instances 1` (2 instances use ~2.4 GB of GPU memory,
-  1 instance uses ~1.2 GB of GPU memory.)
-* If you are using an AMD GPU with the **Radeon Software Crimson Edition**
-  driver, as opposed to the **AMDGPU-PRO** driver, then edit param.h and set
-  `OPTIM_SIMPLIFY_ROUND` to 1. This will improve performance by +5% and reduce
-  GPU memory usage from 1.2 GB per instance to 805 MB per instance. But do
-  **not** set it if you are using the AMDGPU-PRO driver or else it will
-  degrade performance by -15% or more.
-* If 1 instance still requires too much memory, edit `param.h` and set
-  `NR_ROWS_LOG` to `19` (this reduces the per-instance memory usage to ~670 MB)
-  and run with `--instances 1`.
+For a potential performance speedup, set `OPTIM_SIMPLIFY_ROUND` to 1,
+see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 # Dependencies
 
