@@ -5,10 +5,10 @@ OPENCL_HEADERS = "/opt/AMDAPPSDK-3.0/include"
 LIBOPENCL = "/opt/amdgpu-pro/lib/x86_64-linux-gnu"
 
 CC = gcc
-CPPFLAGS = -std=gnu99 -pedantic -Wextra -Wall -ggdb \
+CPPFLAGS = -I${OPENCL_HEADERS}
+CFLAGS = -O2 -std=gnu99 -pedantic -Wextra -Wall -ggdb \
     -Wno-deprecated-declarations \
-    -Wno-overlength-strings \
-    -I${OPENCL_HEADERS}
+    -Wno-overlength-strings
 LDFLAGS = -rdynamic -L${LIBOPENCL}
 LDLIBS = -lOpenCL
 OBJ = main.o blake.o sha256.o
@@ -34,6 +34,3 @@ clean :
 	rm -f sa-solver _kernel.h *.o _temp_*
 
 re : clean all
-
-.cpp.o :
-	${CC} ${CPPFLAGS} -o $@ -c $<
