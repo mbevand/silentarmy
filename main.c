@@ -1049,8 +1049,6 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
     uint64_t		total_shares = 0;
     uint64_t		t0 = 0, t1;
     uint64_t		status_period = 500e3; // time (usec) between statuses
-    puts("SILENTARMY mining mode ready");
-    fflush(stdout);
     for (i = 0; ; i++)
       {
         // iteration #0 always reads a job or else there is nothing to do
@@ -1427,6 +1425,8 @@ int main(int argc, char **argv)
                 break ;
           }
     tests();
+    if (mining)
+	puts("SILENTARMY mining mode ready"), fflush(stdout);
     header_len = parse_header(header, sizeof (header), hex_header);
     init_and_run_opencl(header, header_len);
     return 0;
