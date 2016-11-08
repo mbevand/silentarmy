@@ -422,8 +422,9 @@ ulong half_aligned_long(__global ulong *p, uint offset)
 /*
 ** Access a well-aligned int.
 */
-uint well_aligned_int(__global char *p, uint offset)
+uint well_aligned_int(__global ulong *_p, uint offset)
 {
+    __global char *p = (__global char *)_p;
     return *(__global uint *)(p + offset);
 }
 

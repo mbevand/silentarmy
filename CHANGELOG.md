@@ -1,6 +1,7 @@
 # Current tip
 
 * Update README.md with Nvidia performance numbers
+* Fix mining on Xeon Phi and CPUs (fix OpenCL warnings)
 
 # Version 4 (08 Nov 2016)
 
