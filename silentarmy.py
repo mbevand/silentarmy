@@ -336,7 +336,7 @@ class Silentarmy:
             if not solline:
                 self.cleanup_solvers(devid)
                 return
-            solline = solline.decode('ascii').rstrip()
+            solline = solline.decode('utf8').rstrip()
             very_verbose('From solver %s: %s' % (devid, solline))
             decoded = decode_solver_line(solline)
             if decoded[0] == 'sol':

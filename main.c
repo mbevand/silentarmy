@@ -975,8 +975,6 @@ int read_last_line(char *buf, size_t len, int block)
     ssize_t	n;
 #ifndef WIN32
     set_blocking_mode(0, block);
-#else
-	int c;
 #endif
 	while (42)
       {
@@ -1004,13 +1002,22 @@ int read_last_line(char *buf, size_t len, int block)
 			// 1 (or more) complete lines were read
 			break;
 #else
-		  c = fgetc(stdin);
-		 
-		  if (c == EOF)
+		  DWORD bytesAvailable = 0;
+		  HANDLE stdinHandle = GetStdHandle(STD_INPUT_HANDLE);
+		  PeekNamedPipe(stdinHandle, NULL, 0, NULL, &bytesAvailable, NULL);
+		  if (bytesAvailable > 0) {
+			  
+			  if (!ReadFile(stdinHandle, buf, bytesAvailable, &bytesAvailable, NULL)) {
+				  fatal("ReadFile: %d", GetLastError());
+			  }
+			  pos += bytesAvailable;
+		  }
+		  else {
+			  return 0;
+		  }
+		  if (buf[pos - 1] == '\n')
+			  // 1 (or more) complete lines were read
 			  break;
-		  if ((*buf++ = c) == '\n')
-			  break;
-		  pos++;
 #endif
       }
     start = memrchr(buf, '\n', pos - 1);
@@ -1023,7 +1030,6 @@ int read_last_line(char *buf, size_t len, int block)
       }
     // overwrite '\n' with NUL
 
-	printf("%s", buf);
     buf[pos - 1] = 0;
     return 1;
 }
@@ -1110,11 +1116,12 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
     fflush(stdout);
 #ifdef WIN32
 	srand(time(NULL));
-	//SetConsoleOutputCP(65001);
+	SetConsoleOutputCP(65001);
 #endif
     for (i = 0; ; i++)
       {
         // iteration #0 always reads a job or else there is nothing to do
+
         if (read_last_line(line, sizeof (line), !i))
             mining_parse_job(line,
                     target, sizeof (target),
