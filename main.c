@@ -1477,15 +1477,15 @@ int main(int argc, char **argv)
                 if (PARAM_K != parse_num(optarg))
                     fatal("Unsupported k (must be %d)\n", PARAM_K);
                 break ;
-	    case OPT_LIST:
-		do_list_devices = 1;
-		break ;
-	    case OPT_USE:
-		gpu_to_use = parse_num(optarg);
-		break ;
-	    case OPT_MINING:
-
-		break ;
+			case OPT_LIST:
+				do_list_devices = 1;
+				break ;
+			case OPT_USE:
+				gpu_to_use = parse_num(optarg);
+				break ;
+			case OPT_MINING:
+				mining = 1;
+				break ;
             default:
                 fatal("Try '%s --help'\n", argv[0]);
                 break ;
