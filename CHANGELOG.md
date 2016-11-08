@@ -1,7 +1,12 @@
+# Current tip
+
+* Update README.md with Nvidia performance numbers
+
 # Version 4 (08 Nov 2016)
 
 * Add Nvidia GPU support (fix more unaligned memory accesses)
-* Add nerdralph's optimization for potential +10% speedup (OPTIM_SIMPLIFY_ROUND)
+* Add nerdralph's optimization (OPTIM_SIMPLIFY_ROUND) for potential +30%
+  speedup, especially useful on Nvidia GPUs
 * Drop the Python 3.5 dependency; now requires only Python 3.3 or above (lhl)
 * Drop the libsodium dependency; instead use our own SHA256 implementation
 * Add nicehash compatibility (stratum servers fixing 17 bytes of the nonce)

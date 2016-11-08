@@ -85,9 +85,11 @@ and statistics in progressively more and more details.
 
 # Performance
 
-* 47.5 Sol/s with one R9 Nano
-* 45.0 Sol/s with one R9 290X
-* 41.0 Sol/s with one RX 480 8GB
+* 47.5 sol/s with one R9 Nano
+* 45.0 sol/s with one R9 290X
+* 41.0 sol/s with one RX 480 8GB
+* 30.5 sol/s with one GTX Titan X (Maxwell)
+* 30.5 sol/s with one GTX Titan (Kepler)
 
 Note: the `silentarmy` **miner** automatically achieves this performance level,
 however the `sa-solver` **command-line solver** by design runs only 1 instance
