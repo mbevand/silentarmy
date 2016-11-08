@@ -28,7 +28,6 @@
 
 typedef SSIZE_T ssize_t;
 
-
 #define open _open
 #define read _read
 #define write _write
@@ -1115,7 +1114,9 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
     puts("SILENTARMY mining mode ready");
     fflush(stdout);
 #ifdef WIN32
-	srand(time(NULL));
+	TIMEVAL t;
+	gettimeofday(&t1, NULL);
+	srand(t.tv_usec * t.tv_sec);
 	SetConsoleOutputCP(65001);
 #endif
     for (i = 0; ; i++)
