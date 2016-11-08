@@ -321,8 +321,13 @@ class Silentarmy:
             print('Solver %s: EOF while reading banner' % devid)
             self.cleanup_solvers(devid)
             return
-        banner = banner.decode('ascii').rstrip()
-        print(banner)
+
+        if sys.platform == 'win32':
+            encoding = 'utf8'
+        else:
+            encoding = 'ascii'
+					   
+        banner = banner.decode(encoding).rstrip()
         very_verbose('From solver %s: banner "%s"' % (devid, banner))
         if banner != "SILENTARMY mining mode ready":
             print('Solver %s: unexpected banner "%s"' % (devid, banner))
@@ -336,7 +341,7 @@ class Silentarmy:
             if not solline:
                 self.cleanup_solvers(devid)
                 return
-            solline = solline.decode('utf8').rstrip()
+            solline = solline.decode(encoding).rstrip()
             very_verbose('From solver %s: %s' % (devid, solline))
             decoded = decode_solver_line(solline)
             if decoded[0] == 'sol':
@@ -539,11 +544,15 @@ def main():
             default='0',
             help="use specified GPU device IDs to mine, for example to use " +
             "the first three: 0,1,2 (default: 0)")
+    if sys.platform == 'win32':
+        defaultInstances = 1
+    else:
+        defaultInstances = 2
     parser.add_option(
             "--instances",
             dest="instances", action="store", type="int", metavar="N",
-            default=2,
-            help="run N instances of Equihash per GPU (default: 2)")
+            default=defaultInstances,
+            help="run N instances of Equihash per GPU (default: %d)" % (defaultInstances))
     parser.add_option(
             "-c", "--connect",
             dest="pool", action="store", type="string", metavar="POOL",
