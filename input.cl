@@ -137,16 +137,22 @@ uint ht_store(uint round, __global char *ht, uint i,
     else if (round == 2)
       {
 	// store 20 bytes
-	*(__global ulong *)(p + 0) = xi0;
-	*(__global ulong *)(p + 8) = xi1;
-	*(__global uint *)(p + 16) = xi2;
+	*(__global uint *)(p + 0) = xi0;
+	*(__global ulong *)(p + 4) = (xi0 >> 32) | (xi1 << 32);
+	*(__global ulong *)(p + 12) = (xi1 >> 32) | (xi2 << 32);
       }
-    else if (round == 3 || round == 4)
+    else if (round == 3)
+      {
+	// store 16 bytes
+	*(__global uint *)(p + 0) = xi0;
+	*(__global ulong *)(p + 4) = (xi0 >> 32) | (xi1 << 32);
+	*(__global uint *)(p + 12) = (xi1 >> 32);
+      }
+    else if (round == 4)
       {
 	// store 16 bytes
 	*(__global ulong *)(p + 0) = xi0;
 	*(__global ulong *)(p + 8) = xi1;
-
       }
     else if (round == 5)
       {
@@ -157,7 +163,8 @@ uint ht_store(uint round, __global char *ht, uint i,
     else if (round == 6 || round == 7)
       {
 	// store 8 bytes
-	*(__global ulong *)(p + 0) = xi0;
+	*(__global uint *)(p + 0) = xi0;
+	*(__global uint *)(p + 4) = (xi0 >> 32);
       }
     else if (round == 8)
       {
@@ -403,6 +410,24 @@ void kernel_round0(__global ulong *blake_state, __global char *ht,
 #endif
 
 /*
+** Access a half-aligned long, that is a long aligned on a 4-byte boundary.
+*/
+ulong half_aligned_long(__global ulong *p, uint offset)
+{
+    return
+    (((ulong)*(__global uint *)((__global char *)p + offset + 0)) << 0) |
+    (((ulong)*(__global uint *)((__global char *)p + offset + 4)) << 32);
+}
+
+/*
+** Access a well-aligned int.
+*/
+uint well_aligned_int(__global char *p, uint offset)
+{
+    return *(__global uint *)(p + offset);
+}
+
+/*
 ** XOR a pair of Xi values computed at "round - 1" and store the result in the
 ** hash table being built for "round". Note that when building the table for
 ** even rounds we need to skip 1 padding byte present in the "round - 1" table
@@ -436,15 +461,15 @@ uint xor_and_store(uint round, __global char *ht_dst, uint row,
     else if (round == 3)
       {
 	// xor 20 bytes
-	xi0 = *a++ ^ *b++;
-	xi1 = *a++ ^ *b++;
-	xi2 = *(__global uint *)a ^ *(__global uint *)b;
+	xi0 = half_aligned_long(a, 0) ^ half_aligned_long(b, 0);
+	xi1 = half_aligned_long(a, 8) ^ half_aligned_long(b, 8);
+	xi2 = well_aligned_int(a, 16) ^ well_aligned_int(b, 16);
       }
     else if (round == 4 || round == 5)
       {
 	// xor 16 bytes
-	xi0 = *a++ ^ *b++;
-	xi1 = *a ^ *b;
+	xi0 = half_aligned_long(a, 0) ^ half_aligned_long(b, 0);
+	xi1 = half_aligned_long(a, 8) ^ half_aligned_long(b, 8);
 	xi2 = 0;
 	if (round == 4)
 	  {
@@ -469,7 +494,7 @@ uint xor_and_store(uint round, __global char *ht_dst, uint row,
     else if (round == 7 || round == 8)
       {
 	// xor 8 bytes
-	xi0 = *a ^ *b;
+	xi0 = half_aligned_long(a, 0) ^ half_aligned_long(b, 0);
 	xi1 = 0;
 	xi2 = 0;
 	if (round == 8)

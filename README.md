@@ -5,10 +5,8 @@ Official site: https://github.com/mbevand/silentarmy
 SILENTARMY is a [Zcash](https://z.cash) miner for Linux written in OpenCL with
 multi-GPU support. The
 [Stratum](https://github.com/str4d/zips/blob/77-zip-stratum/drafts/str4d-stratum/draft1.rst) protocol is implemented for connecting to mining pools. It runs
-best on AMD GPUs but has also been reported to work on other OpenCL devices such
-as Xeon Phi, Intel GPUs, and through OpenCL CPU drivers. (Nvidia GPUs are not
-currently supported due to an
-[issue](https://github.com/mbevand/silentarmy/issues/6).)
+on AMD GPUs, Nvidia GPUs, and other OpenCL devices such as Xeon Phi,
+Intel GPUs, and through OpenCL CPU drivers.
 
 After compiling SILENTARMY, list the available OpenCL devices:
 
@@ -118,17 +116,21 @@ Troubleshooting performance issues:
 
 # Dependencies
 
-SILENTARMY has primarily been tested with AMD GPUs on 64-bit Linux with
-the **AMDGPU-PRO** driver (amdgpu.ko, for newer GPUs) and the **Radeon Software
-Crimson Edition** driver (fglrx.ko, for older GPUs). Its only build
-dependency is an OpenCL implementation. And its only runtime dependency is
-Python 3.3+ (which supports SILENTARMY's use of the "yield from" syntax.)
+SILENTARMY has only one build dependency: an OpenCL implementation. And it
+has only one runtime dependency: Python 3.3 or later (needed to support the
+use of the `yield from` syntax.)
 
-Installation of the drivers and SDK can be error-prone, so below are
-step-by-step instructions for the AMD OpenCL implementation (**AMD APP SDK**),
-for Ubuntu 16.04 as well as Ubuntu 14.04.
+When running on AMD GPUs, install the **AMD APP SDK** (OpenCL implementation)
+and either:
+* the **AMDGPU-PRO** driver (amdgpu.ko, for newer GPUs), or
+* the **Radeon Software Crimson Edition** driver (fglrx.ko, for older GPUs)
 
-## Ubuntu 16.04
+When running on Nvidia GPUs, install the Nvidia OpenCL development files,
+and their binary driver.
+
+Instructions are provided below for a few Linux versions.
+
+## Ubuntu 16.04 / amdgpu
 
 1. Download the [AMDGPU-PRO Driver](http://support.amd.com/en-us/kb-articles/Pages/AMDGPU-PRO-Install.aspx)
 (as of 30 Oct 2016, the latest version is 16.40)
@@ -153,16 +155,24 @@ for Ubuntu 16.04 as well as Ubuntu 14.04.
 8. Install system-wide by running as root (accept all the default options):
   `$ sudo ./AMD-APP-SDK-v3.0.130.136-GA-linux64.sh`
 
-9. Install compiler dependencies which you will need to compile SILENTARMY:
+9. Install compiler dependencies in order to compile SILENTARMY:
   `$ sudo apt-get install build-essential`
 
-## Ubuntu 14.04
+## Ubuntu 14.04 / fglrx
 
 1. Install the official Ubuntu package:
    `$ sudo apt-get install fglrx`
    (as of 30 Oct 2016, the latest version is 2:15.201-0ubuntu0.14.04.1)
 
 2. Follow steps 5-9 above.
+
+## Ubuntu 16.04 / Nvidia
+
+1. Install the OpenCL development files and the latest driver:
+   `$ sudo apt-get install nvidia-opencl-dev nvidia-361`
+
+2. Install compiler dependencies in order to compile SILENTARMY:
+  `$ sudo apt-get install build-essential`
 
 ## Arch Linux
 
@@ -175,7 +185,7 @@ Compiling SILENTARMY is easy:
 `$ make`
 
 You may need to specify the paths to the locations of your OpenCL C headers
-and libOpenCL.so if the Makefile does not find them:
+and libOpenCL.so if the compiler does not find them:
 
 `$ make OPENCL_HEADERS=/path/here LIBOPENCL=/path/there`
 

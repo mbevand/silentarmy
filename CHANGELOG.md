@@ -1,5 +1,6 @@
 # Current tip
 
+* Add Nvidia GPU support (fix more unaligned memory accesses)
 * Add nerdralph's optimization (OPTIM_FOR_FGLRX)
 * Drop the Python 3.5 dependency; now requires only Python 3.3 or above (lhl)
 * Drop the libsodium dependency; instead use our own SHA256 implementation
