@@ -49,9 +49,10 @@ class Solver(object):
 
     def __del__(self):
         # Free the underlying resources on destruction
-        library.gpu_solver__destroy(self.solver_);
-        self.solver_ = None
-        self.header_ = self.solutions_ = None
+        if (self.solver_ is not None):
+            library.gpu_solver__destroy(self.solver_);
+            self.solver_ = None
+            self.header_ = self.solutions_ = None
 
     def _ensure_library(self):
         # Try to load library from standard
