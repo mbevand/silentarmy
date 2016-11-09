@@ -1,7 +1,7 @@
 /.hg/
 /.hgignore
 /sa-solver
-/_kernel.h
+/_kernel.c
 *.o
 _temp_*
 *.swp

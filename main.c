@@ -16,7 +16,6 @@
 #include <errno.h>
 #include <CL/cl.h>
 #include "blake.h"
-#include "_kernel.h"
 #include "sha256.h"
 
 #include "silentarmy.h"
