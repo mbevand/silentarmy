@@ -56,7 +56,7 @@ class Solver(object):
 
     def _ensure_library(self):
         # Try to load library from standard
-        if (library is None):
+        if library is None:
             load_library()
 
     def find_solutions(self, block_header):
