@@ -1259,8 +1259,8 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
     cl_program program;
     const char *source;
     size_t source_len;
-    load_file("_kernel.h", &source, &source_len);
-    //source = ocl_code;
+    //load_file("_kernel.h", &source, &source_len);
+    source = ocl_code;
     source_len = strlen(ocl_code);
     program = clCreateProgramWithSource(context, 1, (const char **)&source,
 	    &source_len, &status);
