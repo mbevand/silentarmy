@@ -675,7 +675,7 @@ void kernel_sols(__global char *ht0, __global char *ht1, __global sols_t *sols)
     uint		i, j;
     __global char	*a, *b;
     uint		ref_i, ref_j;
-    // it's ok for the collisions array to be so small, as if it fills up
+    // it is ok for the collisions array to be so small, as if it fills up
     // the potential solutions are likely invalid (many duplicate inputs)
     ulong		collisions[5];
     uint		coll;
