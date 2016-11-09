@@ -1,9 +1,10 @@
-#define _GNU_SOURCE	1/* memrchr not available on osx*/
+#define _GNU_SOURCE	1/* memrchr */
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <assert.h>
 #include <sys/types.h>
 #include <sys/time.h>
@@ -12,15 +13,38 @@
 #include <unistd.h>
 #include <getopt.h>
 #include <errno.h>
-/*#include <CL/cl.h>*/
+#ifdef _WIN32
+#include <CL/cl.h>
+#elif defined __unix__
+#include <CL/cl.h>
+#elif defined __APPLE__
 #include <OpenCL/OpenCL.h>
+/* not there so we need to include this func */
+void *
+memrchr(s, c, n)
+    const void *s;
+    int c;
+    size_t n;
+{
+    const unsigned char *cp;
+
+    if (n != 0) {
+	cp = (unsigned char *)s + n;
+	do {
+	    if (*(--cp) == (unsigned char)c)
+		return (void *)cp;
+	} while (--n != 0);
+    }
+    return (void *)0;
+}
+#endif
+
 #include "blake.h"
 #include "_kernel.h"
 #include "sha256.h"
 
 typedef uint8_t		uchar;
 typedef uint32_t	uint;
-typedef uint64_t	ulong;
 #include "param.h"
 
 #define MIN(A, B)	(((A) < (B)) ? (A) : (B))
@@ -592,8 +616,8 @@ void print_sol(uint32_t *values, uint64_t *nonce)
 	show_n_sols = MIN(10, show_n_sols);
     fprintf(stderr, "Soln:");
     // for brievity, only print "small" nonces
-    if (*nonce < (1UL << 32))
-	fprintf(stderr, " 0x%lx:", *nonce);
+    if (*nonce < (1ULL << 32))
+	fprintf(stderr, " 0x%" PRIx64 ":", *nonce);
     for (unsigned i = 0; i < show_n_sols; i++)
 	fprintf(stderr, " %x", values[i]);
     fprintf(stderr, "%s\n", (show_n_sols != (1 << PARAM_K) ? "..." : ""));
@@ -930,25 +954,6 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
 **
 ** Return 1 iff a line was read.
 */
-
-void *
-memrchr(s, c, n)
-    const void *s;
-    int c;
-    size_t n;
-{
-    const unsigned char *cp;
-
-    if (n != 0) {
-	cp = (unsigned char *)s + n;
-	do {
-	    if (*(--cp) == (unsigned char)c)
-		return (void *)cp;
-	} while (--n != 0);
-    }
-    return (void *)0;
-}
-
 int read_last_line(char *buf, size_t len, int block)
 {
     char	*start;
@@ -1063,15 +1068,13 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
     char		line[4096];
     uint8_t		target[SHA256_DIGEST_SIZE];
     char		job_id[256];
-    size_t		fixed_nonce_bytes;
+    size_t		fixed_nonce_bytes = 0;
     uint64_t		i;
     uint64_t		total = 0;
     uint32_t		shares;
     uint64_t		total_shares = 0;
     uint64_t		t0 = 0, t1;
     uint64_t		status_period = 500e3; // time (usec) between statuses
-    puts("SILENTARMY mining mode ready");
-    fflush(stdout);
     for (i = 0; ; i++)
       {
         // iteration #0 always reads a job or else there is nothing to do
@@ -1088,7 +1091,7 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
         if ((t1 = now()) > t0 + status_period)
           {
             t0 = t1;
-            printf("status: %ld %ld\n", total, total_shares);
+            printf("status: %" PRId64 " %" PRId64 "\n", total, total_shares);
             fflush(stdout);
           }
       }
@@ -1130,12 +1133,13 @@ void run_opencl(uint8_t *header, size_t header_len, cl_context ctx,
 		buf_sols, buf_dbg, dbg_size, header, header_len, nonce,
 		0, NULL, NULL, NULL);
     uint64_t t1 = now();
-    fprintf(stderr, "Total %ld solutions in %.1f ms (%.1f Sol/s)\n",
+    fprintf(stderr, "Total %" PRId64 " solutions in %.1f ms (%.1f Sol/s)\n",
 	    total, (t1 - t0) / 1e3, total / ((t1 - t0) / 1e6));
     // Clean up
     if (dbg)
         free(dbg);
     clReleaseMemObject(buf_dbg);
+    clReleaseMemObject(buf_sols);
     clReleaseMemObject(buf_ht[0]);
     clReleaseMemObject(buf_ht[1]);
 }
@@ -1255,8 +1259,8 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
     cl_program program;
     const char *source;
     size_t source_len;
-    //load_file("kernel.cl", &source, &source_len);
-    source = ocl_code;
+    load_file("_kernel.h", &source, &source_len);
+    //source = ocl_code;
     source_len = strlen(ocl_code);
     program = clCreateProgramWithSource(context, 1, (const char **)&source,
 	    &source_len, &status);
@@ -1298,6 +1302,7 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
     status |= clReleaseKernel(k_init_ht);
     for (unsigned round = 0; round < PARAM_K; round++)
 	status |= clReleaseKernel(k_rounds[round]);
+    status |= clReleaseKernel(k_sols);
     status |= clReleaseProgram(program);
     status |= clReleaseCommandQueue(queue);
     status |= clReleaseContext(context);
@@ -1446,6 +1451,8 @@ int main(int argc, char **argv)
                 break ;
           }
     tests();
+    if (mining)
+	puts("SILENTARMY mining mode ready"), fflush(stdout);
     header_len = parse_header(header, sizeof (header), hex_header);
     init_and_run_opencl(header, header_len);
     return 0;

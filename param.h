@@ -8,9 +8,8 @@
 // but occasionally misses ~1% of solutions.
 #define NR_ROWS_LOG                     20
 
-// Set this to 1 if you are using an AMD GPU with the Radeon Software Crimson
-// Edition driver (fglrx.ko), see README.md.
-#define OPTIM_FOR_FGLRX			0
+// Setting this to 1 might make SILENTARMY faster, see TROUBLESHOOTING.md
+#define OPTIM_SIMPLIFY_ROUND			0
 
 // Make hash tables OVERHEAD times larger than necessary to store the average
 // number of elements per row. The ideal value is as small as possible to
@@ -29,7 +28,7 @@
 #define OVERHEAD                        3
 #elif NR_ROWS_LOG == 19
 #define OVERHEAD                        5
-#elif NR_ROWS_LOG == 20 && OPTIM_FOR_FGLRX
+#elif NR_ROWS_LOG == 20 && OPTIM_SIMPLIFY_ROUND
 #define OVERHEAD                        6
 #elif NR_ROWS_LOG == 20
 #define OVERHEAD                        9
@@ -68,8 +67,8 @@
 #define SHA256_TARGET_LEN               (256 / 8)
 
 // Optional features
-#undef ENABLE_DEBUG
-
+//#undef ENABLE_DEBUG
+#define ENABLE_DEBUG
 /*
 ** Return the offset of Xi in bytes from the beginning of the slot.
 */

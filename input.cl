@@ -137,16 +137,22 @@ uint ht_store(uint round, __global char *ht, uint i,
     else if (round == 2)
       {
 	// store 20 bytes
-	*(__global ulong *)(p + 0) = xi0;
-	*(__global ulong *)(p + 8) = xi1;
-	*(__global uint *)(p + 16) = xi2;
+	*(__global uint *)(p + 0) = xi0;
+	*(__global ulong *)(p + 4) = (xi0 >> 32) | (xi1 << 32);
+	*(__global ulong *)(p + 12) = (xi1 >> 32) | (xi2 << 32);
       }
-    else if (round == 3 || round == 4)
+    else if (round == 3)
+      {
+	// store 16 bytes
+	*(__global uint *)(p + 0) = xi0;
+	*(__global ulong *)(p + 4) = (xi0 >> 32) | (xi1 << 32);
+	*(__global uint *)(p + 12) = (xi1 >> 32);
+      }
+    else if (round == 4)
       {
 	// store 16 bytes
 	*(__global ulong *)(p + 0) = xi0;
 	*(__global ulong *)(p + 8) = xi1;
-
       }
     else if (round == 5)
       {
@@ -157,7 +163,8 @@ uint ht_store(uint round, __global char *ht, uint i,
     else if (round == 6 || round == 7)
       {
 	// store 8 bytes
-	*(__global ulong *)(p + 0) = xi0;
+	*(__global uint *)(p + 0) = xi0;
+	*(__global uint *)(p + 4) = (xi0 >> 32);
       }
     else if (round == 8)
       {
@@ -220,7 +227,7 @@ void kernel_round0(__global ulong *blake_state, __global char *ht,
         // mix in length of data
         v[12] ^= ZCASH_BLOCK_HEADER_LEN + 4 /* length of "i" */;
         // last block
-        v[14] ^= -1;
+        v[14] ^= (ulong)-1;
 
         // round 1
         mix(v[0], v[4], v[8],  v[12], 0, word1);
@@ -403,6 +410,25 @@ void kernel_round0(__global ulong *blake_state, __global char *ht,
 #endif
 
 /*
+** Access a half-aligned long, that is a long aligned on a 4-byte boundary.
+*/
+ulong half_aligned_long(__global ulong *p, uint offset)
+{
+    return
+    (((ulong)*(__global uint *)((__global char *)p + offset + 0)) << 0) |
+    (((ulong)*(__global uint *)((__global char *)p + offset + 4)) << 32);
+}
+
+/*
+** Access a well-aligned int.
+*/
+uint well_aligned_int(__global ulong *_p, uint offset)
+{
+    __global char *p = (__global char *)_p;
+    return *(__global uint *)(p + offset);
+}
+
+/*
 ** XOR a pair of Xi values computed at "round - 1" and store the result in the
 ** hash table being built for "round". Note that when building the table for
 ** even rounds we need to skip 1 padding byte present in the "round - 1" table
@@ -436,15 +462,15 @@ uint xor_and_store(uint round, __global char *ht_dst, uint row,
     else if (round == 3)
       {
 	// xor 20 bytes
-	xi0 = *a++ ^ *b++;
-	xi1 = *a++ ^ *b++;
-	xi2 = *(__global uint *)a ^ *(__global uint *)b;
+	xi0 = half_aligned_long(a, 0) ^ half_aligned_long(b, 0);
+	xi1 = half_aligned_long(a, 8) ^ half_aligned_long(b, 8);
+	xi2 = well_aligned_int(a, 16) ^ well_aligned_int(b, 16);
       }
     else if (round == 4 || round == 5)
       {
 	// xor 16 bytes
-	xi0 = *a++ ^ *b++;
-	xi1 = *a ^ *b;
+	xi0 = half_aligned_long(a, 0) ^ half_aligned_long(b, 0);
+	xi1 = half_aligned_long(a, 8) ^ half_aligned_long(b, 8);
 	xi2 = 0;
 	if (round == 4)
 	  {
@@ -469,7 +495,7 @@ uint xor_and_store(uint round, __global char *ht_dst, uint row,
     else if (round == 7 || round == 8)
       {
 	// xor 8 bytes
-	xi0 = *a ^ *b;
+	xi0 = half_aligned_long(a, 0) ^ half_aligned_long(b, 0);
 	xi1 = 0;
 	xi2 = 0;
 	if (round == 8)
@@ -532,7 +558,7 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
     if (!cnt)
 	// no elements in row, no collisions
 	return ;
-#if NR_ROWS_LOG != 20 || !OPTIM_FOR_FGLRX
+#if NR_ROWS_LOG != 20 || !OPTIM_SIMPLIFY_ROUND
     p += xi_offset;
     for (i = 0; i < cnt; i++, p += SLOT_LEN)
         first_words[i] = *(__global uchar *)p;
@@ -540,7 +566,7 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
     // find collisions
     for (i = 0; i < cnt; i++)
         for (j = i + 1; j < cnt; j++)
-#if NR_ROWS_LOG != 20 || !OPTIM_FOR_FGLRX
+#if NR_ROWS_LOG != 20 || !OPTIM_SIMPLIFY_ROUND
             if ((first_words[i] & mask) ==
 		    (first_words[j] & mask))
               {
@@ -583,12 +609,14 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
 ** This defines kernel_round1, kernel_round2, ..., kernel_round7.
 */
 #define KERNEL_ROUND(N) \
-__kernel __attribute__((reqd_work_group_size(64, 1, 1))) \
+
+/*__kernel __attribute__((reqd_work_group_size(64, 1, 1))) \
 void kernel_round ## N(__global char *ht_src, __global char *ht_dst, \
 	__global uint *debug) \
 { \
     equihash_round(N, ht_src, ht_dst, debug); \
 }
+*/
 KERNEL_ROUND(1)
 KERNEL_ROUND(2)
 KERNEL_ROUND(3)

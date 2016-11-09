@@ -1,0 +1,9 @@
+environment:
+  matrix:
+    - PYTHON: "C:\\Python35"
+    - PYTHON: "C:\\Python35-x64"
+
+build: false
+
+test_script:
+  - "%PYTHON%\\python.exe runtests.py"
