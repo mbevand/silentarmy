@@ -5,6 +5,7 @@
   solutions on-device
 * Optimization: reduce size of collisions[] array; +7% speed increase measured
   on RX 480 and R9 Nano using AMDGPU-PRO 16.40
+* Avoid segfault when encountering an out-of-range input
 * Update README.md with Nvidia performance numbers
 * Fix mining on Xeon Phi and CPUs (fix OpenCL warnings)
 * Fix compilation warnings and 32-bit platforms

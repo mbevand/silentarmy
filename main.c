@@ -751,6 +751,12 @@ uint32_t verify_sol(sols_t *sols, unsigned sol_i)
     memset(seen, 0, seen_len);
     for (i = 0; i < (1 << PARAM_K); i++)
       {
+	if (inputs[i] / 8 >= seen_len)
+	  {
+	    warn("Invalid input retrieved from device: %d\n", inputs[i]);
+	    sols->valid[sol_i] = 0;
+	    return 0;
+	  }
 	tmp = seen[inputs[i] / 8];
 	seen[inputs[i] / 8] |= 1 << (inputs[i] & 7);
 	if (tmp == seen[inputs[i] / 8])
