@@ -1,5 +1,7 @@
 # Current tip
 
+* Optimizations: reduce size of collisions[] array; +7% speed increase measured
+  on RX 480 and R9 Nano using AMDGPU-PRO 16.40
 * Update README.md with Nvidia performance numbers
 * Fix mining on Xeon Phi and CPUs (fix OpenCL warnings)
 * Fix compilation warnings and 32-bit platforms
