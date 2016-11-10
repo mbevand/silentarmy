@@ -640,25 +640,39 @@ uint expand_ref(__global char *ht, uint xi_offset, uint row, uint slot)
 	    slot * SLOT_LEN + xi_offset - 4);
 }
 
-void expand_refs(__global uint *ins, uint nr_inputs, __global char **htabs,
+/*
+** Expand references to inputs. Return 1 if so far the solution appears valid,
+** or 0 otherwise (an invalid solution would be a solution with duplicate
+** inputs, which can be detected at the last step: round == 0).
+*/
+uint expand_refs(uint *ins, uint nr_inputs, __global char **htabs,
 	uint round)
 {
     __global char	*ht = htabs[round % 2];
     uint		i = nr_inputs - 1;
     uint		j = nr_inputs * 2 - 1;
     uint		xi_offset = xi_offset_for_round(round);
+    int			dup_to_watch = -1;
     do
       {
 	ins[j] = expand_ref(ht, xi_offset,
 		DECODE_ROW(ins[i]), DECODE_SLOT1(ins[i]));
 	ins[j - 1] = expand_ref(ht, xi_offset,
 		DECODE_ROW(ins[i]), DECODE_SLOT0(ins[i]));
+	if (!round)
+	  {
+	    if (dup_to_watch == -1)
+		dup_to_watch = ins[j];
+	    else if (ins[j] == dup_to_watch || ins[j - 1] == dup_to_watch)
+		return 0;
+	  }
 	if (!i)
 	    break ;
 	i--;
 	j -= 2;
       }
     while (1);
+    return 1;
 }
 
 /*
@@ -667,23 +681,28 @@ void expand_refs(__global uint *ins, uint nr_inputs, __global char **htabs,
 void potential_sol(__global char **htabs, __global sols_t *sols,
 	uint ref0, uint ref1)
 {
-    uint	sol_i;
     uint	nr_values;
-    sol_i = atomic_inc(&sols->nr);
-    if (sol_i >= MAX_SOLS)
-	return ;
-    sols->valid[sol_i] = 0;
+    uint	values_tmp[(1 << PARAM_K)];
+    uint	sol_i;
+    uint	i;
     nr_values = 0;
-    sols->values[sol_i][nr_values++] = ref0;
-    sols->values[sol_i][nr_values++] = ref1;
+    values_tmp[nr_values++] = ref0;
+    values_tmp[nr_values++] = ref1;
     uint round = PARAM_K - 1;
     do
       {
 	round--;
-	expand_refs(&(sols->values[sol_i][0]), nr_values, htabs, round);
+	if (!expand_refs(values_tmp, nr_values, htabs, round))
+	    return ;
 	nr_values *= 2;
       }
     while (round > 0);
+    // solution appears valid, copy it to sols
+    sol_i = atomic_inc(&sols->nr);
+    if (sol_i >= MAX_SOLS)
+	return ;
+    for (i = 0; i < (1 << PARAM_K); i++)
+	sols->values[sol_i][i] = values_tmp[i];
     sols->valid[sol_i] = 1;
 }
 

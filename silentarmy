@@ -145,6 +145,7 @@ class Silentarmy:
         self.solver_procs = {}
         self.solver_binary = os.path.join(sys.path[0], 'sa-solver')
         # Stratum-related attributes
+        self.st_transport = None
         self.st_conn_attempt = 0
         self.st_had_job = False
         self.st_protocol = StratumClientProtocol(self)
@@ -194,7 +195,7 @@ class Silentarmy:
         coro = self.loop.create_connection(lambda: self.st_protocol,
                 self.host, self.port)
         try:
-            yield from coro
+            (self.st_transport, _) = yield from coro
         except Exception as e:
             print("Stratum: error connecting: %s" % e)
             my_ensure_future(self.reconnect())
@@ -506,6 +507,10 @@ class Silentarmy:
                     #   hashReserved, nTime, nBits, clean_jobs ]
                     self.set_new_job(*msg['params'][:8])
                     self.update_mining_job()
+                elif msg['method'] == 'client.reconnect':
+                    print("Stratum server forcing a reconnection")
+                    self.st_transport.close()
+                    # reconnection will happen automatically in connection_lost()
                 else:
                     raise Exception('Unimplemented method: %s' % msg['method'])
             else:

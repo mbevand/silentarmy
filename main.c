@@ -751,6 +751,12 @@ uint32_t verify_sol(sols_t *sols, unsigned sol_i)
     memset(seen, 0, seen_len);
     for (i = 0; i < (1 << PARAM_K); i++)
       {
+	if (inputs[i] / 8 >= seen_len)
+	  {
+	    warn("Invalid input retrieved from device: %d\n", inputs[i]);
+	    sols->valid[sol_i] = 0;
+	    return 0;
+	  }
 	tmp = seen[inputs[i] / 8];
 	seen[inputs[i] / 8] |= 1 << (inputs[i] & 7);
 	if (tmp == seen[inputs[i] / 8])
@@ -796,6 +802,7 @@ uint32_t verify_sols(cl_command_queue queue, cl_mem buf_sols, uint64_t *nonce,
 		sols->nr - MAX_SOLS);
 	sols->nr = MAX_SOLS;
       }
+    debug("Retrieved %d potential solutions\n", sols->nr);
     nr_valid_sols = 0;
     for (unsigned sol_i = 0; sol_i < sols->nr; sol_i++)
 	nr_valid_sols += verify_sol(sols, sol_i);
@@ -834,7 +841,7 @@ uint32_t verify_sols(cl_command_queue queue, cl_mem buf_sols, uint64_t *nonce,
 uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
 	cl_kernel k_init_ht, cl_kernel *k_rounds, cl_kernel k_sols,
 	cl_mem *buf_ht, cl_mem buf_sols, cl_mem buf_dbg, size_t dbg_size,
-	uint8_t *header, size_t header_len, uint64_t nonce,
+	uint8_t *header, size_t header_len, char do_increment,
 	size_t fixed_nonce_bytes, uint8_t *target, char *job_id,
 	uint32_t *shares)
 {
@@ -844,35 +851,22 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
     size_t              local_work_size = 64;
     uint32_t		sol_found = 0;
     uint64_t		*nonce_ptr;
+    assert(header_len == ZCASH_BLOCK_HEADER_LEN);
     if (mining)
-      {
-	// mining mode must specify full header
-	assert(header_len == ZCASH_BLOCK_HEADER_LEN);
 	assert(target && job_id);
-      }
-    else
-	assert(header_len == ZCASH_BLOCK_HEADER_LEN ||
-		header_len == ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN);
     nonce_ptr = (uint64_t *)(header + ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN);
-    // add the nonce. if (header_len == ZCASH_BLOCK_HEADER_LEN) the full
-    // header is preserved between calls to solve_equihash(), so we can just
-    // increment by 1, else 'nonce' is used to construct the 32-byte nonce.
-    if (mining)
+    if (do_increment)
       {
-	// increment bytes 17-19
-	(*(uint32_t *)((uint8_t *)nonce_ptr + 17))++;
-	// byte 20 and above must be zero
-	*(uint32_t *)((uint8_t *)nonce_ptr + 20) = 0;
-      }
-    else
-      {
-	if (header_len == ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN)
+	// Increment the nonce
+	if (mining)
 	  {
-	    memset(nonce_ptr, 0, ZCASH_NONCE_LEN);
-	    // add the nonce
-	    *nonce_ptr += nonce;
+	    // increment bytes 17-19
+	    (*(uint32_t *)((uint8_t *)nonce_ptr + 17))++;
+	    // byte 20 and above must be zero
+	    *(uint32_t *)((uint8_t *)nonce_ptr + 20) = 0;
 	  }
 	else
+	    // increment bytes 0-7
 	    (*nonce_ptr)++;
       }
     debug("\nSolving nonce %s\n", s_hexdump(nonce_ptr, ZCASH_NONCE_LEN));
@@ -881,6 +875,7 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
     zcash_blake2b_update(&blake, header, 128, 0);
     buf_blake_st = check_clCreateBuffer(ctx, CL_MEM_READ_ONLY |
 	    CL_MEM_COPY_HOST_PTR, sizeof (blake.h), &blake.h);
+
     for (unsigned round = 0; round < PARAM_K; round++)
       {
 	if (verbose > 1)
@@ -1060,7 +1055,7 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
                     header, ZCASH_BLOCK_HEADER_LEN,
                     &fixed_nonce_bytes);
         total += solve_equihash(ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
-                buf_sols, buf_dbg, dbg_size, header, ZCASH_BLOCK_HEADER_LEN, i,
+                buf_sols, buf_dbg, dbg_size, header, ZCASH_BLOCK_HEADER_LEN, 1,
                 fixed_nonce_bytes, target, job_id, &shares);
         total_shares += shares;
         if ((t1 = now()) > t0 + status_period)
@@ -1105,7 +1100,7 @@ void run_opencl(uint8_t *header, size_t header_len, cl_context ctx,
     // Solve Equihash for a few nonces
     for (nonce = 0; nonce < nr_nonces; nonce++)
 	total += solve_equihash(ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
-		buf_sols, buf_dbg, dbg_size, header, header_len, nonce,
+		buf_sols, buf_dbg, dbg_size, header, header_len, !!nonce,
 		0, NULL, NULL, NULL);
     uint64_t t1 = now();
     fprintf(stderr, "Total %" PRId64 " solutions in %.1f ms (%.1f Sol/s)\n",
@@ -1290,31 +1285,28 @@ uint32_t parse_header(uint8_t *h, size_t h_len, const char *hex)
     size_t      hex_len;
     size_t      bin_len;
     size_t	opt0 = ZCASH_BLOCK_HEADER_LEN;
-    size_t	opt1 = ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN;
     size_t      i;
     if (!hex)
       {
 	if (!do_list_devices && !mining)
 	    fprintf(stderr, "Solving default all-zero %zd-byte header\n", opt0);
-	return opt1;
+	return opt0;
       }
     hex_len = strlen(hex);
     bin_len = hex_len / 2;
     if (hex_len % 2)
 	fatal("Error: input header must be an even number of hex digits\n");
-    if (bin_len != opt0 && bin_len != opt1)
-	fatal("Error: input header must be either a %zd-byte full header, "
-		"or a %zd-byte nonceless header\n", opt0, opt1);
+    if (bin_len != opt0)
+	fatal("Error: input header must be a %zd-byte full header\n", opt0);
     assert(bin_len <= h_len);
     for (i = 0; i < bin_len; i ++)
 	h[i] = hex2val(hex, i * 2) * 16 + hex2val(hex, i * 2 + 1);
-    if (bin_len == opt0)
-	while (--i >= bin_len - N_ZERO_BYTES)
-	    if (h[i])
-		fatal("Error: last %d bytes of full header (ie. last %d "
-			"bytes of 32-byte nonce) must be zero due to an "
-			"optimization in my BLAKE2b implementation\n",
-			N_ZERO_BYTES, N_ZERO_BYTES);
+    while (--i >= bin_len - N_ZERO_BYTES)
+	if (h[i])
+	    fatal("Error: last %d bytes of full header (ie. last %d "
+		    "bytes of 32-byte nonce) must be zero due to an "
+		    "optimization in my BLAKE2b implementation\n",
+		    N_ZERO_BYTES, N_ZERO_BYTES);
     return bin_len;
 }
 

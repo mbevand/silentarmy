@@ -76,9 +76,7 @@ quick test/benchmark is simply:
 `$ sa-solver --nonces 100`
 
 Note: due to BLAKE2b optimizations in my implementation, if the header is
-specified it must be 140 bytes and its last 12 bytes **must** be zero. For
-convenience, `-i` can also specify a 108-byte nonceless header to which
-`sa-solver` adds an implicit nonce of 32 zero bytes.
+specified it must be 140 bytes and its last 12 bytes **must** be zero.
 
 Use the verbose (`-v`) and very verbose (`-v -v`) options to show the solutions
 and statistics in progressively more and more details.
@@ -173,9 +171,9 @@ Compiling SILENTARMY is easy:
 `$ make`
 
 You may need to specify the paths to the locations of your OpenCL C headers
-and libOpenCL.so if the compiler does not find them:
+and libOpenCL.so if the compiler does not find them, eg.:
 
-`$ make OPENCL_HEADERS=/path/here LIBOPENCL=/path/there`
+`$ make OPENCL_HEADERS=/usr/local/cuda-8.0/targets/x86_64-linux/include LIBOPENCL=/usr/local/cuda-8.0/targets/x86_64-linux/lib`
 
 Self-testing the command-line solver (solves 100 all-zero 140-byte blocks with
 their nonces varying from 0 to 99):
@@ -240,6 +238,8 @@ almost certainly bits 180-199), this is also discarded as a likely invalid
 solution because this is statistically guaranteed to be all inputs repeated
 at least once. This check is implemented in `kernel_sols()` (see
 `likely_invalids`.)
+* When input references are expanded on-GPU by `expand_refs()`, the code
+checks if the last (512th) input is repeated at least once.
 * Finally when the GPU returns potential solutions, the CPU also checks for
 invalid solutions with duplicate inputs. This check is implemented in
 `verify_sol()`.
@@ -259,6 +259,7 @@ I would like to thank these persons for their contributions to SILENTARMY,
 in alphabetical order:
 * lhl
 * nerdralph
+* poiuty
 * solardiz
 
 # License
