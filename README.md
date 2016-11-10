@@ -76,9 +76,7 @@ quick test/benchmark is simply:
 `$ sa-solver --nonces 100`
 
 Note: due to BLAKE2b optimizations in my implementation, if the header is
-specified it must be 140 bytes and its last 12 bytes **must** be zero. For
-convenience, `-i` can also specify a 108-byte nonceless header to which
-`sa-solver` adds an implicit nonce of 32 zero bytes.
+specified it must be 140 bytes and its last 12 bytes **must** be zero.
 
 Use the verbose (`-v`) and very verbose (`-v -v`) options to show the solutions
 and statistics in progressively more and more details.
