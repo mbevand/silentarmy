@@ -435,7 +435,7 @@ class Silentarmy:
         if not re.match(r'^[0-9a-fA-F]{8}$', nbits):
             raise Exception('Invalid nBits: %s' % nbits)
         self.zcash_nonceless_header = bytes.fromhex(nversion + \
-                hash_prev_block + hash_merkle_root + hash_reserved + ntime + 
+                hash_prev_block + hash_merkle_root + hash_reserved + ntime +
                 nbits)
 
     def stratum_next_id(self):
@@ -447,6 +447,8 @@ class Silentarmy:
         '''Generate a stratum message to call the specified method.'''
         if method == 'mining.subscribe':
             p = ["silentarmy", None, self.host, str(self.port)]
+        elif method == 'mining.extranonce.subscribe':
+            p = []
         elif method == 'mining.authorize':
             p = [self.opts.user]
             if self.opts.pwd:
@@ -482,6 +484,15 @@ class Silentarmy:
                 if self.st_state == 'SENT_SUBSCRIBE':
                     # result: [ <ignored>, nonce_leftpart ]
                     self.set_nonce_leftpart(msg['result'][1])
+                    if self.opts.extranonce_subscribe or re.match(r'equihash.*.nicehash.com', self.host):
+                        self.st_state = 'SENT_EXTRANONCE_SUBSCRIBE'
+                        verbose("mining.extranonce.subscribe enabled")
+                        return self.stratum_msg('mining.extranonce.subscribe')
+                    else:
+                        self.st_state = 'SENT_AUTHORIZE'
+                        return self.stratum_msg('mining.authorize')
+                elif self.st_state == 'SENT_EXTRANONCE_SUBSCRIBE':
+                    # ignore
                     self.st_state = 'SENT_AUTHORIZE'
                     return self.stratum_msg('mining.authorize')
                 elif self.st_state == 'SENT_AUTHORIZE':
@@ -501,6 +512,9 @@ class Silentarmy:
                 if msg['method'] == 'mining.set_target':
                     # params: [ target ]
                     self.set_target(msg['params'][0])
+                elif msg['method'] == 'mining.set_extranonce':
+                    # params: [ target ]
+                    self.set_nonce_leftpart(msg['params'][0])
                 elif msg['method'] == 'mining.notify':
                     # params: [ job_id, nVersion, hashPrevBlock, hashMerkleRoot,
                     #   hashReserved, nTime, nBits, clean_jobs ]
@@ -557,6 +571,10 @@ def main():
             "-p", "--pwd",
             dest="pwd", action="store", type="string", metavar="PWD",
             help="password for connecting to the pool")
+    parser.add_option(
+            "--extranonce-subscribe",
+            dest="extranonce_subscribe", action="store_true",
+            help="Enable 'extranonce' stratum subscribe")
     (opts, args) = parser.parse_args()
     if args:
         parser.error("Extraneous arguments found on command line")
@@ -569,6 +587,8 @@ def main():
         fatal("Invalid syntax for --use: %s" % opts.use)
     if opts.instances < 1:
         fatal("The number of instances per GPU should be 1 or greater")
+
+
     Silentarmy(opts).run()
 
 if __name__ == "__main__":

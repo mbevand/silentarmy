@@ -608,7 +608,7 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
 /*
 ** This defines kernel_round1, kernel_round2, ..., kernel_round7.
 */
-   
+
     __kernel __attribute__((reqd_work_group_size(64, 1, 1))) void kernel_round1 (__global char *ht_src, __global char *ht_dst,__global uint *debug) { equihash_round(1, ht_src, ht_dst, debug);}
     __kernel __attribute__((reqd_work_group_size(64, 1, 1))) void kernel_round2 (__global char *ht_src, __global char *ht_dst,__global uint *debug) { equihash_round(2, ht_src, ht_dst, debug);}
     __kernel __attribute__((reqd_work_group_size(64, 1, 1))) void kernel_round3 (__global char *ht_src, __global char *ht_dst,__global uint *debug) { equihash_round(3, ht_src, ht_dst, debug);}
@@ -697,7 +697,7 @@ void kernel_sols(__global char *ht0, __global char *ht1, __global sols_t *sols)
     uint		ref_i, ref_j;
     // it is ok for the collisions array to be so small, as if it fills up
     // the potential solutions are likely invalid (many duplicate inputs)
-    ulong		collisions[5];
+    ulong		collisions[1];
     uint		coll;
 #if NR_ROWS_LOG >= 16 && NR_ROWS_LOG <= 20
     // in the final hash table, we are looking for a match on both the bits
