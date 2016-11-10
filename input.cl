@@ -608,22 +608,14 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
 /*
 ** This defines kernel_round1, kernel_round2, ..., kernel_round7.
 */
-#define KERNEL_ROUND(N) \
-
-/*__kernel __attribute__((reqd_work_group_size(64, 1, 1))) \
-void kernel_round ## N(__global char *ht_src, __global char *ht_dst, \
-	__global uint *debug) \
-{ \
-    equihash_round(N, ht_src, ht_dst, debug); \
-}
-*/
-KERNEL_ROUND(1)
-KERNEL_ROUND(2)
-KERNEL_ROUND(3)
-KERNEL_ROUND(4)
-KERNEL_ROUND(5)
-KERNEL_ROUND(6)
-KERNEL_ROUND(7)
+   
+    __kernel __attribute__((reqd_work_group_size(64, 1, 1))) void kernel_round1 (__global char *ht_src, __global char *ht_dst,__global uint *debug) { equihash_round(1, ht_src, ht_dst, debug);}
+    __kernel __attribute__((reqd_work_group_size(64, 1, 1))) void kernel_round2 (__global char *ht_src, __global char *ht_dst,__global uint *debug) { equihash_round(2, ht_src, ht_dst, debug);}
+    __kernel __attribute__((reqd_work_group_size(64, 1, 1))) void kernel_round3 (__global char *ht_src, __global char *ht_dst,__global uint *debug) { equihash_round(3, ht_src, ht_dst, debug);}
+    __kernel __attribute__((reqd_work_group_size(64, 1, 1))) void kernel_round4 (__global char *ht_src, __global char *ht_dst,__global uint *debug) { equihash_round(4, ht_src, ht_dst, debug);}
+    __kernel __attribute__((reqd_work_group_size(64, 1, 1))) void kernel_round5 (__global char *ht_src, __global char *ht_dst,__global uint *debug) { equihash_round(5, ht_src, ht_dst, debug);}
+    __kernel __attribute__((reqd_work_group_size(64, 1, 1))) void kernel_round6 (__global char *ht_src, __global char *ht_dst,__global uint *debug) { equihash_round(6, ht_src, ht_dst, debug);}
+    __kernel __attribute__((reqd_work_group_size(64, 1, 1))) void kernel_round7 (__global char *ht_src, __global char *ht_dst,__global uint *debug) { equihash_round(7, ht_src, ht_dst, debug);}
 
 // kernel_round8 takes an extra argument, "sols"
 __kernel __attribute__((reqd_work_group_size(64, 1, 1)))
