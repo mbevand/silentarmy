@@ -62,7 +62,7 @@
 // instructions. 10 is the max supported by the hw.
 #define BLAKE_WPS               	10
 // Maximum number of solutions reported by kernel to host
-#define MAX_SOLS			2000
+#define MAX_SOLS			10
 // Length of SHA256 target
 #define SHA256_TARGET_LEN               (256 / 8)
 

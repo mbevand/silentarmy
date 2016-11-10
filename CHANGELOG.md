@@ -1,6 +1,9 @@
 # Current tip
 
-* Optimizations: reduce size of collisions[] array; +7% speed increase measured
+* Optimization: significantly reduce CPU usage and PCIe bandwidth (before:
+  ~100 MB/s/GPU, after: 0.5 MB/s/GPU), accomplished by filtering invalid
+  solutions on-device
+* Optimization: reduce size of collisions[] array; +7% speed increase measured
   on RX 480 and R9 Nano using AMDGPU-PRO 16.40
 * Update README.md with Nvidia performance numbers
 * Fix mining on Xeon Phi and CPUs (fix OpenCL warnings)

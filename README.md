@@ -240,6 +240,8 @@ almost certainly bits 180-199), this is also discarded as a likely invalid
 solution because this is statistically guaranteed to be all inputs repeated
 at least once. This check is implemented in `kernel_sols()` (see
 `likely_invalids`.)
+* When input references are expanded on-GPU by `expand_refs()`, the code
+checks if the last (512th) input is repeated at least once.
 * Finally when the GPU returns potential solutions, the CPU also checks for
 invalid solutions with duplicate inputs. This check is implemented in
 `verify_sol()`.

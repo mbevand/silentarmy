@@ -796,6 +796,7 @@ uint32_t verify_sols(cl_command_queue queue, cl_mem buf_sols, uint64_t *nonce,
 		sols->nr - MAX_SOLS);
 	sols->nr = MAX_SOLS;
       }
+    debug("Retrieved %d potential solutions\n", sols->nr);
     nr_valid_sols = 0;
     for (unsigned sol_i = 0; sol_i < sols->nr; sol_i++)
 	nr_valid_sols += verify_sol(sols, sol_i);
