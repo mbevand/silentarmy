@@ -85,9 +85,8 @@ and statistics in progressively more and more details.
 
 # Performance
 
-* 47.5 sol/s with one R9 Nano
-* 45.0 sol/s with one R9 290X
-* 41.0 sol/s with one RX 480 8GB
+* 51.0 sol/s with one R9 Nano
+* 44.0 sol/s with one RX 480 8GB
 * 30.5 sol/s with one GTX Titan X (Maxwell)
 * 30.5 sol/s with one GTX Titan (Kepler)
 
