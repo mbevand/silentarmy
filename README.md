@@ -175,14 +175,14 @@ Compiling SILENTARMY is easy:
 
 ## Mac OS
 1. Install Xcode and Xcode Commandline tools
- `$ xcode-select --install`
+ ``$ xcode-select --install``
 2. Install python 3
- `$ brew install python3`
+ ``$ brew install python3``
  or
 `$ sudo port install python3` 
 3. Checkout the repository
- `$ git clone https://github.com/justvanbloom/silentarmy.git`
-4. Compile the Binary
+ ``$ git clone https://github.com/justvanbloom/silentarmy.git``
+4. Compile the Binary using
  `$ make`
 5. Test if it works
 `$ make test`
