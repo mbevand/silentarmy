@@ -5,6 +5,7 @@
   solutions on-device
 * Optimization: reduce size of collisions[] array; +7% speed increase measured
   on RX 480 and R9 Nano using AMDGPU-PRO 16.40
+* Implement stratum method client.reconnect
 * Avoid segfault when encountering an out-of-range input
 * For simplicity `-i <header>` now only accepts 140-byte headers
 * Update README.md with Nvidia performance numbers

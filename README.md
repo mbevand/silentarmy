@@ -259,6 +259,7 @@ I would like to thank these persons for their contributions to SILENTARMY,
 in alphabetical order:
 * lhl
 * nerdralph
+* poiuty
 * solardiz
 
 # License
