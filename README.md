@@ -1,12 +1,10 @@
 # SILENTARMY
 
-SILENTARMY is a [Zcash](https://z.cash) miner for Linux written in OpenCL with
-multi-GPU support. The
-[Stratum](https://github.com/str4d/zips/blob/77-zip-stratum/drafts/str4d-stratum/draft1.rst) protocol is implemented for connecting to mining pools. It runs
-best on AMD GPUs but has also been reported to work on other OpenCL devices such
-as Xeon Phi, Intel GPUs, and through OpenCL CPU drivers. (Nvidia GPUs are not
-currently supported due to an
-[issue](https://github.com/mbevand/silentarmy/issues/6).)
+Official site: https://github.com/mbevand/silentarmy
+
+SILENTARMY is a free open source [Zcash](https://z.cash) miner for Linux
+with multi-GPU and [Stratum](https://github.com/str4d/zips/blob/77-zip-stratum/drafts/str4d-stratum/draft1.rst) support. It is written in OpenCL and has been tested
+on AMD/Nvidia/Intel GPUs, Xeon Phi, and more.
 
 After compiling SILENTARMY, list the available OpenCL devices:
 
@@ -87,9 +85,10 @@ and statistics in progressively more and more details.
 
 # Performance
 
-* 47.5 Sol/s with one R9 Nano
-* 45.0 Sol/s with one R9 290X
-* 41.0 Sol/s with one RX 480 8GB
+* 51.0 sol/s with one R9 Nano
+* 44.0 sol/s with one RX 480 8GB
+* 30.5 sol/s with one GTX Titan X (Maxwell)
+* 30.5 sol/s with one GTX Titan (Kepler)
 
 Note: the `silentarmy` **miner** automatically achieves this performance level,
 however the `sa-solver` **command-line solver** by design runs only 1 instance
@@ -97,32 +96,26 @@ of the Equihash proof-of-work algorithm causing it to underperform. One must
 manually run 2 instances of `sa-solver` (eg. in 2 terminal consoles) to
 achieve the same performance level as the `silentarmy` **miner**.
 
-Troubleshooting performance issues:
-* By default SILENTARMY mines with only one device/GPU; make sure to specify
-  all the GPUs in the `--use` option, for example `silentarmy --use 0,1,2`
-  if the host has three devices with IDs 0, 1, and 2.
-* If some GPUs have less than ~2.4 GB of GPU memory, run
-  `silentarmy --instances 1 --use ...` (2 instances use ~2.4 GB of GPU memory,
-  1 instance uses ~1.2 GB of GPU memory.)
-* If 1 instance still requires too much memory, edit `param.h` and set
-  `NR_ROWS_LOG` to `19` (this reduces the per-instance memory usage to ~670 MB)
-  and run with `--instances 1`.
+For a potential performance speedup, set `OPTIM_SIMPLIFY_ROUND` to 1,
+see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 # Dependencies
 
-SILENTARMY has primarily been tested with AMD GPUs on 64-bit Linux with
-the **AMDGPU-PRO** driver (amdgpu.ko, for newer GPUs) and the **Radeon Software
-Crimson Edition** driver (fglrx.ko, for older GPUs). Its only build
-dependency is an OpenCL implementation.
+SILENTARMY has only one build dependency: an OpenCL implementation. And it
+has only one runtime dependency: Python 3.3 or later (needed to support the
+use of the `yield from` syntax.)
 
-Installation of the drivers and SDK can be error-prone, so below are
-step-by-step instructions for the AMD OpenCL implementation (**AMD APP SDK**),
-for Ubuntu 16.04 as well as Ubuntu 14.04 (beware: the `silentarmy` miner makes
-use of Python's `ensure_future()` which requires Python 3.4.4, however Ubuntu
-14.04 ships 3.4.3, therefore only the `sa-solver` tool is usable on Ubuntu
-14.04.)
+When running on AMD GPUs, install the **AMD APP SDK** (OpenCL implementation)
+and either:
+* the **AMDGPU-PRO** driver (amdgpu.ko, for newer GPUs), or
+* the **Radeon Software Crimson Edition** driver (fglrx.ko, for older GPUs)
 
-## Ubuntu 16.04
+When running on Nvidia GPUs, install the Nvidia OpenCL development files,
+and their binary driver.
+
+Instructions are provided below for a few Linux versions.
+
+## Ubuntu 16.04 / amdgpu
 
 1. Download the [AMDGPU-PRO Driver](http://support.amd.com/en-us/kb-articles/Pages/AMDGPU-PRO-Install.aspx)
 (as of 30 Oct 2016, the latest version is 16.40)
@@ -147,16 +140,27 @@ use of Python's `ensure_future()` which requires Python 3.4.4, however Ubuntu
 8. Install system-wide by running as root (accept all the default options):
   `$ sudo ./AMD-APP-SDK-v3.0.130.136-GA-linux64.sh`
 
-9. Install compiler dependencies which you will need to compile SILENTARMY:
+9. Install compiler dependencies in order to compile SILENTARMY:
   `$ sudo apt-get install build-essential`
 
-## Ubuntu 14.04
+## Ubuntu 14.04 / fglrx
 
 1. Install the official Ubuntu package:
    `$ sudo apt-get install fglrx`
    (as of 30 Oct 2016, the latest version is 2:15.201-0ubuntu0.14.04.1)
 
 2. Follow steps 5-9 above.
+
+## Ubuntu 16.04 / Nvidia
+
+1. Install the OpenCL development files and the latest driver:
+   `$ sudo apt-get install nvidia-opencl-dev nvidia-361`
+
+2. Either reboot, or load the kernel driver:
+   `$ modprobe nvidia_361`
+
+3. Install compiler dependencies in order to compile SILENTARMY:
+  `$ sudo apt-get install build-essential`
 
 ## Arch Linux
 
@@ -169,7 +173,7 @@ Compiling SILENTARMY is easy:
 `$ make`
 
 You may need to specify the paths to the locations of your OpenCL C headers
-and libOpenCL.so if the Makefile does not find them:
+and libOpenCL.so if the compiler does not find them:
 
 `$ make OPENCL_HEADERS=/path/here LIBOPENCL=/path/there`
 
@@ -248,6 +252,14 @@ supports Equihash parameters 200,9.
 Marc Bevand -- [http://zorinaq.com](http://zorinaq.com)
 
 Donations welcome: t1cVviFvgJinQ4w3C2m2CfRxgP5DnHYaoFC
+
+# Thanks
+
+I would like to thank these persons for their contributions to SILENTARMY,
+in alphabetical order:
+* lhl
+* nerdralph
+* solardiz
 
 # License
 

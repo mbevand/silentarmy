@@ -1,0 +1,10 @@
+/.hg/
+/.hgignore
+/sa-solver
+/_kernel.h
+*.o
+_temp_*
+*.swp
+*.tmp
+*.pyc
+tags

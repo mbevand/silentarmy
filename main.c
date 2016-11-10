@@ -4,6 +4,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <assert.h>
 #include <sys/types.h>
 #include <sys/time.h>
@@ -19,7 +20,6 @@
 
 typedef uint8_t		uchar;
 typedef uint32_t	uint;
-typedef uint64_t	ulong;
 #include "param.h"
 
 #define MIN(A, B)	(((A) < (B)) ? (A) : (B))
@@ -591,8 +591,8 @@ void print_sol(uint32_t *values, uint64_t *nonce)
 	show_n_sols = MIN(10, show_n_sols);
     fprintf(stderr, "Soln:");
     // for brievity, only print "small" nonces
-    if (*nonce < (1UL << 32))
-	fprintf(stderr, " 0x%lx:", *nonce);
+    if (*nonce < (1ULL << 32))
+	fprintf(stderr, " 0x%" PRIx64 ":", *nonce);
     for (unsigned i = 0; i < show_n_sols; i++)
 	fprintf(stderr, " %x", values[i]);
     fprintf(stderr, "%s\n", (show_n_sols != (1 << PARAM_K) ? "..." : ""));
@@ -844,19 +844,37 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
     size_t              local_work_size = 64;
     uint32_t		sol_found = 0;
     uint64_t		*nonce_ptr;
-    assert(header_len == ZCASH_BLOCK_HEADER_LEN ||
-	    header_len == ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN);
     if (mining)
+      {
+	// mining mode must specify full header
+	assert(header_len == ZCASH_BLOCK_HEADER_LEN);
 	assert(target && job_id);
-    nonce_ptr = (uint64_t *)(header + ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN);
-    if (header_len == ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN)
-	memset(nonce_ptr, 0, ZCASH_NONCE_LEN);
-    // add the nonce
-    if (mining)
-	// increment bytes 16-19
-	*(uint32_t *)((uint8_t *)nonce_ptr + 16) += nonce;
+      }
     else
-	*nonce_ptr += nonce;
+	assert(header_len == ZCASH_BLOCK_HEADER_LEN ||
+		header_len == ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN);
+    nonce_ptr = (uint64_t *)(header + ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN);
+    // add the nonce. if (header_len == ZCASH_BLOCK_HEADER_LEN) the full
+    // header is preserved between calls to solve_equihash(), so we can just
+    // increment by 1, else 'nonce' is used to construct the 32-byte nonce.
+    if (mining)
+      {
+	// increment bytes 17-19
+	(*(uint32_t *)((uint8_t *)nonce_ptr + 17))++;
+	// byte 20 and above must be zero
+	*(uint32_t *)((uint8_t *)nonce_ptr + 20) = 0;
+      }
+    else
+      {
+	if (header_len == ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN)
+	  {
+	    memset(nonce_ptr, 0, ZCASH_NONCE_LEN);
+	    // add the nonce
+	    *nonce_ptr += nonce;
+	  }
+	else
+	    (*nonce_ptr)++;
+      }
     debug("\nSolving nonce %s\n", s_hexdump(nonce_ptr, ZCASH_NONCE_LEN));
     // Process first BLAKE2b-400 block
     zcash_blake2b_init(&blake, ZCASH_HASH_LEN, PARAM_N, PARAM_K);
@@ -1025,15 +1043,13 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
     char		line[4096];
     uint8_t		target[SHA256_DIGEST_SIZE];
     char		job_id[256];
-    size_t		fixed_nonce_bytes;
+    size_t		fixed_nonce_bytes = 0;
     uint64_t		i;
     uint64_t		total = 0;
     uint32_t		shares;
     uint64_t		total_shares = 0;
     uint64_t		t0 = 0, t1;
     uint64_t		status_period = 500e3; // time (usec) between statuses
-    puts("SILENTARMY mining mode ready");
-    fflush(stdout);
     for (i = 0; ; i++)
       {
         // iteration #0 always reads a job or else there is nothing to do
@@ -1050,7 +1066,7 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
         if ((t1 = now()) > t0 + status_period)
           {
             t0 = t1;
-            printf("status: %ld %ld\n", total, total_shares);
+            printf("status: %" PRId64 " %" PRId64 "\n", total, total_shares);
             fflush(stdout);
           }
       }
@@ -1092,12 +1108,13 @@ void run_opencl(uint8_t *header, size_t header_len, cl_context ctx,
 		buf_sols, buf_dbg, dbg_size, header, header_len, nonce,
 		0, NULL, NULL, NULL);
     uint64_t t1 = now();
-    fprintf(stderr, "Total %ld solutions in %.1f ms (%.1f Sol/s)\n",
+    fprintf(stderr, "Total %" PRId64 " solutions in %.1f ms (%.1f Sol/s)\n",
 	    total, (t1 - t0) / 1e3, total / ((t1 - t0) / 1e6));
     // Clean up
     if (dbg)
         free(dbg);
     clReleaseMemObject(buf_dbg);
+    clReleaseMemObject(buf_sols);
     clReleaseMemObject(buf_ht[0]);
     clReleaseMemObject(buf_ht[1]);
 }
@@ -1260,6 +1277,7 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
     status |= clReleaseKernel(k_init_ht);
     for (unsigned round = 0; round < PARAM_K; round++)
 	status |= clReleaseKernel(k_rounds[round]);
+    status |= clReleaseKernel(k_sols);
     status |= clReleaseProgram(program);
     status |= clReleaseCommandQueue(queue);
     status |= clReleaseContext(context);
@@ -1408,6 +1426,8 @@ int main(int argc, char **argv)
                 break ;
           }
     tests();
+    if (mining)
+	puts("SILENTARMY mining mode ready"), fflush(stdout);
     header_len = parse_header(header, sizeof (header), hex_header);
     init_and_run_opencl(header, header_len);
     return 0;

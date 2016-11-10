@@ -137,16 +137,22 @@ uint ht_store(uint round, __global char *ht, uint i,
     else if (round == 2)
       {
 	// store 20 bytes
-	*(__global ulong *)(p + 0) = xi0;
-	*(__global ulong *)(p + 8) = xi1;
-	*(__global uint *)(p + 16) = xi2;
+	*(__global uint *)(p + 0) = xi0;
+	*(__global ulong *)(p + 4) = (xi0 >> 32) | (xi1 << 32);
+	*(__global ulong *)(p + 12) = (xi1 >> 32) | (xi2 << 32);
       }
-    else if (round == 3 || round == 4)
+    else if (round == 3)
+      {
+	// store 16 bytes
+	*(__global uint *)(p + 0) = xi0;
+	*(__global ulong *)(p + 4) = (xi0 >> 32) | (xi1 << 32);
+	*(__global uint *)(p + 12) = (xi1 >> 32);
+      }
+    else if (round == 4)
       {
 	// store 16 bytes
 	*(__global ulong *)(p + 0) = xi0;
 	*(__global ulong *)(p + 8) = xi1;
-
       }
     else if (round == 5)
       {
@@ -157,7 +163,8 @@ uint ht_store(uint round, __global char *ht, uint i,
     else if (round == 6 || round == 7)
       {
 	// store 8 bytes
-	*(__global ulong *)(p + 0) = xi0;
+	*(__global uint *)(p + 0) = xi0;
+	*(__global uint *)(p + 4) = (xi0 >> 32);
       }
     else if (round == 8)
       {
@@ -220,7 +227,7 @@ void kernel_round0(__global ulong *blake_state, __global char *ht,
         // mix in length of data
         v[12] ^= ZCASH_BLOCK_HEADER_LEN + 4 /* length of "i" */;
         // last block
-        v[14] ^= -1;
+        v[14] ^= (ulong)-1;
 
         // round 1
         mix(v[0], v[4], v[8],  v[12], 0, word1);
@@ -403,6 +410,25 @@ void kernel_round0(__global ulong *blake_state, __global char *ht,
 #endif
 
 /*
+** Access a half-aligned long, that is a long aligned on a 4-byte boundary.
+*/
+ulong half_aligned_long(__global ulong *p, uint offset)
+{
+    return
+    (((ulong)*(__global uint *)((__global char *)p + offset + 0)) << 0) |
+    (((ulong)*(__global uint *)((__global char *)p + offset + 4)) << 32);
+}
+
+/*
+** Access a well-aligned int.
+*/
+uint well_aligned_int(__global ulong *_p, uint offset)
+{
+    __global char *p = (__global char *)_p;
+    return *(__global uint *)(p + offset);
+}
+
+/*
 ** XOR a pair of Xi values computed at "round - 1" and store the result in the
 ** hash table being built for "round". Note that when building the table for
 ** even rounds we need to skip 1 padding byte present in the "round - 1" table
@@ -436,15 +462,15 @@ uint xor_and_store(uint round, __global char *ht_dst, uint row,
     else if (round == 3)
       {
 	// xor 20 bytes
-	xi0 = *a++ ^ *b++;
-	xi1 = *a++ ^ *b++;
-	xi2 = *(__global uint *)a ^ *(__global uint *)b;
+	xi0 = half_aligned_long(a, 0) ^ half_aligned_long(b, 0);
+	xi1 = half_aligned_long(a, 8) ^ half_aligned_long(b, 8);
+	xi2 = well_aligned_int(a, 16) ^ well_aligned_int(b, 16);
       }
     else if (round == 4 || round == 5)
       {
 	// xor 16 bytes
-	xi0 = *a++ ^ *b++;
-	xi1 = *a ^ *b;
+	xi0 = half_aligned_long(a, 0) ^ half_aligned_long(b, 0);
+	xi1 = half_aligned_long(a, 8) ^ half_aligned_long(b, 8);
 	xi2 = 0;
 	if (round == 4)
 	  {
@@ -469,7 +495,7 @@ uint xor_and_store(uint round, __global char *ht_dst, uint row,
     else if (round == 7 || round == 8)
       {
 	// xor 8 bytes
-	xi0 = *a ^ *b;
+	xi0 = half_aligned_long(a, 0) ^ half_aligned_long(b, 0);
 	xi1 = 0;
 	xi2 = 0;
 	if (round == 8)
@@ -498,11 +524,18 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
 {
     uint                tid = get_global_id(0);
     uint		tlid = get_local_id(0);
-    __global uint       *rowptr;
+    __global char       *p;
     uint                cnt;
-    uchar               mask;
-    uint                i, j, n;
-    uint                dropped_coll, dropped_stor;
+    uchar		first_words[NR_SLOTS];
+    uchar		mask;
+    uint                i, j;
+    // NR_SLOTS is already oversized (by a factor of OVERHEAD), but we want to
+    // make it even larger
+    ushort		collisions[NR_SLOTS * 3];
+    uint                nr_coll = 0;
+    uint                n;
+    uint		dropped_coll = 0;
+    uint		dropped_stor = 0;
     __global ulong      *a, *b;
     uint		xi_offset;
     // read first words of Xi from the previous (round - 1) hash table
@@ -519,25 +552,53 @@ void equihash_round(uint round, __global char *ht_src, __global char *ht_dst,
 #else
 #error "unsupported NR_ROWS_LOG"
 #endif
-    rowptr = (__global uint *)(ht_src + tid * NR_SLOTS * SLOT_LEN);
-    cnt = *rowptr;
-    if (cnt == 0) return;
+    p = (ht_src + tid * NR_SLOTS * SLOT_LEN);
+    cnt = *(__global uint *)p;
     cnt = min(cnt, (uint)NR_SLOTS); // handle possible overflow in prev. round
-
-    dropped_stor = 0;
+    if (!cnt)
+	// no elements in row, no collisions
+	return ;
+#if NR_ROWS_LOG != 20 || !OPTIM_SIMPLIFY_ROUND
+    p += xi_offset;
+    for (i = 0; i < cnt; i++, p += SLOT_LEN)
+        first_words[i] = *(__global uchar *)p;
+#endif
+    // find collisions
     for (i = 0; i < cnt; i++)
         for (j = i + 1; j < cnt; j++)
-        // XOR colliding pairs of Xi
+#if NR_ROWS_LOG != 20 || !OPTIM_SIMPLIFY_ROUND
+            if ((first_words[i] & mask) ==
+		    (first_words[j] & mask))
+              {
+                // collision!
+                if (nr_coll >= sizeof (collisions) / sizeof (*collisions))
+                    dropped_coll++;
+                else
+#if NR_SLOTS <= (1 << 8)
+                    // note: this assumes slots can be encoded in 8 bits
+                    collisions[nr_coll++] =
+			((ushort)j << 8) | ((ushort)i & 0xff);
+#else
+#error "unsupported NR_SLOTS"
+#endif
+              }
+    // XOR colliding pairs of Xi
+    for (n = 0; n < nr_coll; n++)
       {
+        i = collisions[n] & 0xff;
+        j = collisions[n] >> 8;
+#else
+      {
+#endif
         a = (__global ulong *)
             (ht_src + tid * NR_SLOTS * SLOT_LEN + i * SLOT_LEN + xi_offset);
         b = (__global ulong *)
             (ht_src + tid * NR_SLOTS * SLOT_LEN + j * SLOT_LEN + xi_offset);
 	dropped_stor += xor_and_store(round, ht_dst, tid, i, j, a, b);
       }
-
+    if (round < 8)
 	// reset the counter in preparation of the next round
-    if (round < 8) *rowptr = 0;
+	*(__global uint *)(ht_src + tid * NR_SLOTS * SLOT_LEN) = 0;
 #ifdef ENABLE_DEBUG
     debug[tid * 2] = dropped_coll;
     debug[tid * 2 + 1] = dropped_stor;
@@ -642,7 +703,7 @@ void kernel_sols(__global char *ht0, __global char *ht1, __global sols_t *sols)
     uint		ref_i, ref_j;
     // it's ok for the collisions array to be so small, as if it fills up
     // the potential solutions are likely invalid (many duplicate inputs)
-    ulong		collisions[5];
+    ulong		collisions[1];
     uint		coll;
 #if NR_ROWS_LOG >= 16 && NR_ROWS_LOG <= 20
     // in the final hash table, we are looking for a match on both the bits
