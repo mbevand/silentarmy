@@ -6,7 +6,7 @@ LIBOPENCL = "/opt/amdgpu-pro/lib/x86_64-linux-gnu"
 
 CC = gcc
 CPPFLAGS = -I${OPENCL_HEADERS}
-CFLAGS = -O2 -std=gnu99 -pedantic -Wextra -Wall -ggdb \
+CFLAGS = -O2 -std=gnu99 -pedantic -Wextra -Wall \
     -Wno-deprecated-declarations \
     -Wno-overlength-strings
 LDFLAGS = -rdynamic -L${LIBOPENCL}
