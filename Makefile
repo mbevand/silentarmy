@@ -27,8 +27,14 @@ _kernel.h : input.cl param.h
 	echo ')_mrb_";' >>$@
 
 test : sa-solver
-	./sa-solver --nonces 100 -v -v 2>&1 | grep Soln: | \
-	    diff -u testing/sols-100 - | cut -c 1-75
+	# When compiling with NR_ROWS_LOG != 20, the solutions it finds are
+	# different: testing/sols-100
+	if res=`./sa-solver --nonces 100 -v -v 2>&1 | grep Soln: | \
+	    diff -u testing/sols-100.nr_rows_log_20 -`; then \
+	    echo "Test: success"; \
+	else \
+	    echo "$$res\nTest: FAILED" | cut -c 1-75 >&2; \
+	fi
 
 clean :
 	rm -f sa-solver _kernel.h *.o _temp_*

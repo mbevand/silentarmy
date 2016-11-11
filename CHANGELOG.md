@@ -1,5 +1,12 @@
 # Current tip
 
+* Optimization: major 2x speedup (eXtremal) by storing 8 atomic counters in
+  1 uint, and by reducing branch divergence when iterating over and XORing Xi's.
+  Note that as a result of these optimizations, sa-solver compiled with
+  NR_ROWS_LOG=20 now only finds 182 out of 196 existing solutions ("make test"
+  verification data was adjusted accordingly)
+* Defaulting OPTIM_SIMPLIFY_ROUND to 1; GPU memory usage down to 0.8 GB per
+  instance
 * Optimization: significantly reduce CPU usage and PCIe bandwidth (before:
   ~100 MB/s/GPU, after: 0.5 MB/s/GPU), accomplished by filtering invalid
   solutions on-device

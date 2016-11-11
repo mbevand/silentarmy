@@ -83,19 +83,15 @@ and statistics in progressively more and more details.
 
 # Performance
 
-* 51.0 sol/s with one R9 Nano
-* 44.0 sol/s with one RX 480 8GB
-* 30.5 sol/s with one GTX Titan X (Maxwell)
-* 30.5 sol/s with one GTX Titan (Kepler)
+* 102.0 sol/s with one R9 Nano
+* 72.0 sol/s with one RX 480 8GB
+* (TODO: benchmark Nvidia GPUs)
 
 Note: the `silentarmy` **miner** automatically achieves this performance level,
 however the `sa-solver` **command-line solver** by design runs only 1 instance
-of the Equihash proof-of-work algorithm causing it to underperform. One must
-manually run 2 instances of `sa-solver` (eg. in 2 terminal consoles) to
-achieve the same performance level as the `silentarmy` **miner**.
-
-For a potential performance speedup, set `OPTIM_SIMPLIFY_ROUND` to 1,
-see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+of the Equihash proof-of-work algorithm causing it to slightly underperform by
+5-10%. One must manually run 2 instances of `sa-solver` (eg. in 2 terminal
+consoles) to achieve the same performance level as the `silentarmy` **miner**.
 
 # Dependencies
 
@@ -257,6 +253,7 @@ Donations welcome: t1cVviFvgJinQ4w3C2m2CfRxgP5DnHYaoFC
 
 I would like to thank these persons for their contributions to SILENTARMY,
 in alphabetical order:
+* eXtremal
 * lhl
 * nerdralph
 * poiuty
