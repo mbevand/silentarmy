@@ -9,7 +9,7 @@
 #define NR_ROWS_LOG                     20
 
 // Setting this to 1 might make SILENTARMY faster, see TROUBLESHOOTING.md
-#define OPTIM_SIMPLIFY_ROUND			0
+#define OPTIM_SIMPLIFY_ROUND			1
 
 // Make hash tables OVERHEAD times larger than necessary to store the average
 // number of elements per row. The ideal value is as small as possible to
@@ -65,6 +65,16 @@
 #define MAX_SOLS			10
 // Length of SHA256 target
 #define SHA256_TARGET_LEN               (256 / 8)
+
+#if (NR_SLOTS < 16)
+#define BITS_PER_ROW 4
+#define ROWS_PER_UINT 8
+#define ROW_MASK 0x0F
+#else
+#define BITS_PER_ROW 8
+#define ROWS_PER_UINT 4
+#define ROW_MASK 0xFF
+#endif
 
 // Optional features
 #undef ENABLE_DEBUG
