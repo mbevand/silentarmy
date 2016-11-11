@@ -29,7 +29,7 @@ _kernel.h : input.cl param.h
 test : sa-solver
 	@echo Testing...
 	@if res=`./sa-solver --nonces 100 -v -v 2>&1 | grep Soln: | \
-	    diff -u testing/sols-100.nr_rows_log_20 -`; then \
+	    diff -u testing/sols-100 -`; then \
 	    echo "Test: success"; \
 	else \
 	    echo "$$res\nTest: FAILED" | cut -c 1-75 >&2; \
