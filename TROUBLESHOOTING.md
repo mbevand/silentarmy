@@ -62,6 +62,8 @@ Nonce 0100000000000000000000000000000000000000000000000000000000000000: 0 sols
 ...
 ```
 
+It should not crash or hang.
+
 ## Mining
 
 Run the miner without options. By default it will use the first device,
@@ -69,29 +71,27 @@ and connect to flypool with my donation address. These known-good parameters
 should let you know easily if your machine can mine properly:
 
 ```
+$ ./silentarmy
 Connecting to us1-zcash.flypool.org:3333
 Stratum server sent us the first job
 Mining on 1 device
 Total 0.0 sol/s [dev0 0.0] 0 shares
-Total 48.9 sol/s [dev0 48.9] 0 shares
-Total 44.9 sol/s [dev0 44.9] 0 shares
+Total 48.9 sol/s [dev0 48.9] 1 share
+Total 44.9 sol/s [dev0 44.9] 1 share
 ...
 ```
+
+Verify that the number of shares increases over time.
 
 ## Performance
 
 Not achieving the performance you expected?
 
-* You might want to edit the `param.h` file, look for `OPTIM_SIMPLIFY_ROUND`,
-  and set it to 1 (instead of 0). Then recompile with `make`. Depending on
-  your exact drivers/hardware combination, it may boost performance by +10%,
-  or decrease it. Just try it. Also, setting `OPTIM_SIMPLIFY_ROUND` to 1 will
-  decrease GPU memory usage from 1.2 GB per instance to 805 MB per instance.
 * By default SILENTARMY mines with only one device/GPU; make sure to specify
   all the GPUs in the `--use` option, for example `silentarmy --use 0,1,2`
   if the host has three devices with IDs 0, 1, and 2.
-* If a GPU has less than ~2.4 GB of GPU memory, run `silentarmy --instances 1`
-  (1 instance uses ~1.2 GB of memory, 2 instances use ~2.4 GB of memory.)
+* If a GPU has less than 2 GB of GPU memory, run `silentarmy --instances 1`
+  (1 instance uses ~0.8 GB of memory, 2 instances use ~1.6 GB of memory.)
 * If 1 instance still requires too much memory, edit `param.h` and set
   `NR_ROWS_LOG` to `19` (this reduces the per-instance memory usage to ~670 MB)
   and run with `--instances 1`.

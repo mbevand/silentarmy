@@ -76,27 +76,22 @@ quick test/benchmark is simply:
 `$ sa-solver --nonces 100`
 
 Note: due to BLAKE2b optimizations in my implementation, if the header is
-specified it must be 140 bytes and its last 12 bytes **must** be zero. For
-convenience, `-i` can also specify a 108-byte nonceless header to which
-`sa-solver` adds an implicit nonce of 32 zero bytes.
+specified it must be 140 bytes and its last 12 bytes **must** be zero.
 
 Use the verbose (`-v`) and very verbose (`-v -v`) options to show the solutions
 and statistics in progressively more and more details.
 
 # Performance
 
-* 47.5 Sol/s with one R9 Nano
-* 45.0 Sol/s with one R9 290X
-* 41.0 Sol/s with one RX 480 8GB
+* 102.0 sol/s with one R9 Nano
+* 72.0 sol/s with one RX 480 8GB
+* 64.0 sol/s with one GTX 1070
 
 Note: the `silentarmy` **miner** automatically achieves this performance level,
 however the `sa-solver` **command-line solver** by design runs only 1 instance
-of the Equihash proof-of-work algorithm causing it to underperform. One must
-manually run 2 instances of `sa-solver` (eg. in 2 terminal consoles) to
-achieve the same performance level as the `silentarmy` **miner**.
-
-For a potential performance speedup, set `OPTIM_SIMPLIFY_ROUND` to 1,
-see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+of the Equihash proof-of-work algorithm causing it to slightly underperform by
+5-10%. One must manually run 2 instances of `sa-solver` (eg. in 2 terminal
+consoles) to achieve the same performance level as the `silentarmy` **miner**.
 
 # Dependencies
 
@@ -155,7 +150,10 @@ Instructions are provided below for a few Linux versions.
 1. Install the OpenCL development files and the latest driver:
    `$ sudo apt-get install nvidia-opencl-dev nvidia-361`
 
-2. Install compiler dependencies in order to compile SILENTARMY:
+2. Either reboot, or load the kernel driver:
+   `$ modprobe nvidia_361`
+
+3. Install compiler dependencies in order to compile SILENTARMY:
   `$ sudo apt-get install build-essential`
 
 ## Arch Linux
@@ -169,9 +167,9 @@ Compiling SILENTARMY is easy:
 `$ make`
 
 You may need to specify the paths to the locations of your OpenCL C headers
-and libOpenCL.so if the compiler does not find them:
+and libOpenCL.so if the compiler does not find them, eg.:
 
-`$ make OPENCL_HEADERS=/path/here LIBOPENCL=/path/there`
+`$ make OPENCL_HEADERS=/usr/local/cuda-8.0/targets/x86_64-linux/include LIBOPENCL=/usr/local/cuda-8.0/targets/x86_64-linux/lib`
 
 Self-testing the command-line solver (solves 100 all-zero 140-byte blocks with
 their nonces varying from 0 to 99):
@@ -236,6 +234,8 @@ almost certainly bits 180-199), this is also discarded as a likely invalid
 solution because this is statistically guaranteed to be all inputs repeated
 at least once. This check is implemented in `kernel_sols()` (see
 `likely_invalids`.)
+* When input references are expanded on-GPU by `expand_refs()`, the code
+checks if the last (512th) input is repeated at least once.
 * Finally when the GPU returns potential solutions, the CPU also checks for
 invalid solutions with duplicate inputs. This check is implemented in
 `verify_sol()`.
@@ -253,8 +253,11 @@ Donations welcome: t1cVviFvgJinQ4w3C2m2CfRxgP5DnHYaoFC
 
 I would like to thank these persons for their contributions to SILENTARMY,
 in alphabetical order:
+* eXtremal
 * lhl
 * nerdralph
+* poiuty
+* solardiz
 
 # License
 

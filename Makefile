@@ -5,10 +5,10 @@ OPENCL_HEADERS = "/opt/AMDAPPSDK-3.0/include"
 LIBOPENCL = "/opt/amdgpu-pro/lib/x86_64-linux-gnu"
 
 CC = gcc
-CPPFLAGS = -std=gnu99 -pedantic -Wextra -Wall -ggdb \
+CPPFLAGS = -I${OPENCL_HEADERS}
+CFLAGS = -O2 -std=gnu99 -pedantic -Wextra -Wall \
     -Wno-deprecated-declarations \
-    -Wno-overlength-strings \
-    -I${OPENCL_HEADERS}
+    -Wno-overlength-strings
 LDFLAGS = -rdynamic -L${LIBOPENCL}
 LDLIBS = -lOpenCL
 OBJ = main.o blake.o sha256.o
@@ -27,13 +27,17 @@ _kernel.h : input.cl param.h
 	echo ')_mrb_";' >>$@
 
 test : sa-solver
-	./sa-solver --nonces 100 -v -v 2>&1 | grep Soln: | \
-	    diff -u testing/sols-100 - | cut -c 1-75
+	@echo Testing...
+	@if res=`./sa-solver --nonces 100 -v -v 2>&1 | grep Soln: | \
+	    diff -u testing/sols-100.nr_rows_log_20 -`; then \
+	    echo "Test: success"; \
+	else \
+	    echo "$$res\nTest: FAILED" | cut -c 1-75 >&2; \
+	fi
+#	When compiling with NR_ROWS_LOG != 20, the solutions it finds are
+#	different: testing/sols-100
 
 clean :
 	rm -f sa-solver _kernel.h *.o _temp_*
 
 re : clean all
-
-.cpp.o :
-	${CC} ${CPPFLAGS} -o $@ -c $<
