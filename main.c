@@ -12,6 +12,7 @@
 
 
 #include <errno.h>
+#include <time.h>
 #include <CL/cl.h>
 #include "blake.h"
 #include "sha256.h"
@@ -57,6 +58,7 @@ uint64_t	nr_nonces = 1;
 uint32_t	do_list_devices = 0;
 uint32_t	gpu_to_use = 0;
 uint32_t	mining = 0;
+struct timespec kern_avg_run_time;
 
 typedef struct  debug_s
 {
@@ -145,6 +147,19 @@ void randomize(void *p, ssize_t l)
 	for (int i = 0; i < l; i++)
 		((uint8_t *)p)[i] = rand() & 0xff;
 #endif
+}
+
+struct timespec time_diff(struct timespec start, struct timespec end)
+{
+	struct timespec temp;
+	if ((end.tv_nsec-start.tv_nsec)<0) {
+		temp.tv_sec = end.tv_sec-start.tv_sec-1;
+		temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
+	} else {
+		temp.tv_sec = end.tv_sec-start.tv_sec;
+		temp.tv_nsec = end.tv_nsec-start.tv_nsec;
+	}
+	return temp;
 }
 
 cl_mem check_clCreateBuffer(cl_context ctx, cl_mem_flags flags, size_t size,
@@ -814,13 +829,15 @@ uint32_t verify_sol(sols_t *sols, unsigned sol_i)
 */
 uint32_t verify_sols(cl_command_queue queue, cl_mem buf_sols, uint64_t *nonce,
 	uint8_t *header, size_t fixed_nonce_bytes, uint8_t *target,
-       	char *job_id, uint32_t *shares)
+	char *job_id, uint32_t *shares, struct timespec *start_time)
 {
     sols_t	*sols;
     uint32_t	nr_valid_sols;
     sols = (sols_t *)malloc(sizeof (*sols));
     if (!sols)
-	fatal("malloc: %s\n", strerror(errno));
+		fatal("malloc: %s\n", strerror(errno));
+
+	nanosleep(&kern_avg_run_time, NULL);
     check_clEnqueueReadBuffer(queue, buf_sols,
 	    CL_TRUE,	// cl_bool	blocking_read
 	    0,		// size_t	offset
@@ -829,6 +846,22 @@ uint32_t verify_sols(cl_command_queue queue, cl_mem buf_sols, uint64_t *nonce,
 	    0,		// cl_uint	num_events_in_wait_list
 	    NULL,	// cl_event	*event_wait_list
 	    NULL);	// cl_event	*event
+	struct timespec curr_time;
+	clock_gettime(CLOCK_MONOTONIC, &curr_time);
+
+	struct timespec t_diff = time_diff(*start_time, curr_time);
+
+	double a_diff = t_diff.tv_sec * 1e9 + t_diff.tv_nsec;
+	double kern_avg = kern_avg_run_time.tv_sec * 1e9 +  kern_avg_run_time.tv_nsec;
+	if (kern_avg == 0)
+	kern_avg = a_diff;
+	else
+	kern_avg = kern_avg * 70 / 100 + a_diff * 28 / 100; // it is 2% less than average
+	// thus allowing time to reduce
+
+	kern_avg_run_time.tv_sec = (time_t)(kern_avg / 1e9);
+	kern_avg_run_time.tv_nsec = ((long)kern_avg) % 1000000000;
+
     if (sols->nr > MAX_SOLS)
       {
 	fprintf(stderr, "%d (probably invalid) solutions were dropped!\n",
@@ -942,10 +975,14 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
     check_clSetKernelArg(k_sols, 3, &rowCounters[0]);
     check_clSetKernelArg(k_sols, 4, &rowCounters[1]);
     global_ws = NR_ROWS;
+
+	struct timespec start_time;
+	clock_gettime(CLOCK_MONOTONIC, &start_time);
     check_clEnqueueNDRangeKernel(queue, k_sols, 1, NULL,
 	    &global_ws, &local_work_size, 0, NULL, NULL);
+	clFlush(queue);
     sol_found = verify_sols(queue, buf_sols, nonce_ptr, header,
-	    fixed_nonce_bytes, target, job_id, shares);
+	    fixed_nonce_bytes, target, job_id, shares, &start_time);
     clReleaseMemObject(buf_blake_st);
     return sol_found;
 }
