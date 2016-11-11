@@ -108,7 +108,7 @@ void gpu_solver__encode_sol(uint32_t *sol, size_t count, uint8_t *encoded_sol)
 }
 
 
-int gpu_solver__init(struct gpu_solver *self, uint32_t gpu_to_use, bool verbose_)
+int gpu_solver__init(struct gpu_solver *self, uint32_t platform_id, uint32_t gpu_id, bool verbose_)
 {
   int result = 0;
   cl_uint num_platforms;
@@ -124,13 +124,19 @@ int gpu_solver__init(struct gpu_solver *self, uint32_t gpu_to_use, bool verbose_
     result = -1;
     goto init_failed;
   }
+  /* Create context.*/
+  if (platform_id >= num_platforms) {
+    debug("%d is an invalid OpenCL Platform ID; see\n", platform_id);
+    result = -1;
+    goto init_failed;
+  }
   cl_platform_id* platforms = (cl_platform_id *)
     malloc(num_platforms * sizeof (cl_platform_id));
   status = clGetPlatformIDs(num_platforms, platforms, NULL);
   if (status != CL_SUCCESS)
     fatal("clGetPlatformIDs (%d)\n", status);
-  // always select first platform
-  cl_platform_id platform = platforms[0];
+  // select the user specified platform
+  cl_platform_id platform = platforms[platform_id];
   free(platforms);
   // Query the platform and choose the first GPU device if has one
   status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 0, NULL, &nr_devs);
@@ -145,15 +151,19 @@ int gpu_solver__init(struct gpu_solver *self, uint32_t gpu_to_use, bool verbose_
     fatal("clGetDeviceIDs (%d)\n", status);
 
   /* Create context.*/
-  if (gpu_to_use >= nr_devs) {
-    fatal("%d is an invalid GPU ID; see --list-gpu\n", gpu_to_use);
+  if (gpu_id >= nr_devs) {
+    free(self->devices);
+    self->devices = NULL;
+    result = -1;
+    debug("%d is an invalid GPU ID; see --list-gpu\n", gpu_id);
+    goto init_failed;
   }
-  self->context = clCreateContext(NULL, 1, self->devices + gpu_to_use,
+  self->context = clCreateContext(NULL, 1, self->devices + gpu_id,
 				  NULL, NULL, &status);
   if (status != CL_SUCCESS || !self->context)
     fatal("clCreateContext (%d)\n", status);
   /* Creating command queue associate with the context.*/
-  self->queue = clCreateCommandQueue(self->context, self->devices[gpu_to_use],
+  self->queue = clCreateCommandQueue(self->context, self->devices[gpu_id],
 				     0, &status);
   if (status != CL_SUCCESS || !self->queue)
     fatal("clCreateCommandQueue (%d)\n", status);
@@ -169,12 +179,12 @@ int gpu_solver__init(struct gpu_solver *self, uint32_t gpu_to_use, bool verbose_
     fatal("clCreateProgramWithSource (%d)\n", status);
   /* Build program. */
   fprintf(stderr, "Building program\n");
-  status = clBuildProgram(self->program, 1, self->devices + gpu_to_use,
+  status = clBuildProgram(self->program, 1, self->devices + gpu_id,
 			  "", // compile options
 			  NULL, NULL);
   if (status != CL_SUCCESS) {
     warn("OpenCL build failed (%d). Build log follows:\n", status);
-    get_program_build_log(self->program, self->devices[gpu_to_use]);
+    get_program_build_log(self->program, self->devices[gpu_id]);
     goto init_failed;
   }
   // Create kernel objects
@@ -222,12 +232,12 @@ int gpu_solver__init(struct gpu_solver *self, uint32_t gpu_to_use, bool verbose_
 }
 
 
-struct gpu_solver* gpu_solver__new(uint32_t gpu_to_use, bool verbose_)
+struct gpu_solver* gpu_solver__new(uint32_t platform_id, uint32_t gpu_id, bool verbose_)
 {
   struct gpu_solver *self = malloc(sizeof(struct gpu_solver));
 
   if (self != NULL) {
-    gpu_solver__init(self, gpu_to_use, verbose_);
+    gpu_solver__init(self, platform_id, gpu_id, verbose_);
   }
 
   return self;
