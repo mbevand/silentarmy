@@ -1,4 +1,4 @@
-# Current tip
+# Version 5 (11 Nov 2016)
 
 * Optimization: major 2x speedup (eXtremal) by storing 8 atomic counters in
   1 uint, and by reducing branch divergence when iterating over and XORing Xi's.
