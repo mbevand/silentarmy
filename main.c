@@ -58,6 +58,9 @@ uint64_t	nr_nonces = 1;
 uint32_t	do_list_devices = 0;
 uint32_t	gpu_to_use = 0;
 uint32_t	mining = 0;
+#ifdef WIN32
+#define timespec timeval
+#endif
 struct timespec kern_avg_run_time;
 
 typedef struct  debug_s
@@ -152,6 +155,15 @@ void randomize(void *p, ssize_t l)
 struct timespec time_diff(struct timespec start, struct timespec end)
 {
 	struct timespec temp;
+#ifdef WIN32
+	if ((end.tv_usec - start.tv_usec)<0) {
+		temp.tv_sec = end.tv_sec-start.tv_sec-1;
+		temp.tv_usec = 1000000 + end.tv_usec - start.tv_usec;
+	} else {
+		temp.tv_sec = end.tv_sec-start.tv_sec;
+		temp.tv_usec = end.tv_usec - start.tv_usec;
+	}
+#else
 	if ((end.tv_nsec-start.tv_nsec)<0) {
 		temp.tv_sec = end.tv_sec-start.tv_sec-1;
 		temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
@@ -159,6 +171,7 @@ struct timespec time_diff(struct timespec start, struct timespec end)
 		temp.tv_sec = end.tv_sec-start.tv_sec;
 		temp.tv_nsec = end.tv_nsec-start.tv_nsec;
 	}
+#endif
 	return temp;
 }
 
@@ -836,8 +849,12 @@ uint32_t verify_sols(cl_command_queue queue, cl_mem buf_sols, uint64_t *nonce,
     sols = (sols_t *)malloc(sizeof (*sols));
     if (!sols)
 		fatal("malloc: %s\n", strerror(errno));
-
+#ifdef WIN32
+	printf("sleep: %llu, %llu\n", kern_avg_run_time.tv_sec, kern_avg_run_time.tv_usec);
+	Sleep(kern_avg_run_time.tv_sec * 1000 + kern_avg_run_time.tv_usec / 1000);
+#else
 	nanosleep(&kern_avg_run_time, NULL);
+#endif
     check_clEnqueueReadBuffer(queue, buf_sols,
 	    CL_TRUE,	// cl_bool	blocking_read
 	    0,		// size_t	offset
@@ -847,21 +864,33 @@ uint32_t verify_sols(cl_command_queue queue, cl_mem buf_sols, uint64_t *nonce,
 	    NULL,	// cl_event	*event_wait_list
 	    NULL);	// cl_event	*event
 	struct timespec curr_time;
+#ifdef WIN32
+	gettimeofday(&curr_time, NULL);
+#else
 	clock_gettime(CLOCK_MONOTONIC, &curr_time);
+#endif
 
 	struct timespec t_diff = time_diff(*start_time, curr_time);
-
+#ifdef WIN32
+	double a_diff = t_diff.tv_sec * 1e6 + t_diff.tv_usec;
+	double kern_avg = kern_avg_run_time.tv_sec * 1e6 + kern_avg_run_time.tv_usec;
+#else
 	double a_diff = t_diff.tv_sec * 1e9 + t_diff.tv_nsec;
-	double kern_avg = kern_avg_run_time.tv_sec * 1e9 +  kern_avg_run_time.tv_nsec;
+	double kern_avg = kern_avg_run_time.tv_sec * 1e9 + kern_avg_run_time.tv_nsec;
+#endif
 	if (kern_avg == 0)
 	kern_avg = a_diff;
 	else
 	kern_avg = kern_avg * 70 / 100 + a_diff * 28 / 100; // it is 2% less than average
 	// thus allowing time to reduce
 
+#ifdef WIN32
+	kern_avg_run_time.tv_sec = (time_t)(kern_avg / 1e6);
+	kern_avg_run_time.tv_usec = ((long)kern_avg) % 1000000;
+#else
 	kern_avg_run_time.tv_sec = (time_t)(kern_avg / 1e9);
 	kern_avg_run_time.tv_nsec = ((long)kern_avg) % 1000000000;
-
+#endif
     if (sols->nr > MAX_SOLS)
       {
 	fprintf(stderr, "%d (probably invalid) solutions were dropped!\n",
@@ -977,7 +1006,11 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
     global_ws = NR_ROWS;
 
 	struct timespec start_time;
+#ifdef WIN32
+	gettimeofday(&start_time, NULL);
+#else
 	clock_gettime(CLOCK_MONOTONIC, &start_time);
+#endif
     check_clEnqueueNDRangeKernel(queue, k_sols, 1, NULL,
 	    &global_ws, &local_work_size, 0, NULL, NULL);
 	clFlush(queue);
@@ -1146,7 +1179,7 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
     fflush(stdout);
 #ifdef WIN32
 	TIMEVAL t;
-	gettimeofday(&t1, NULL);
+	gettimeofday(&t, NULL);
 	srand(t.tv_usec * t.tv_sec);
 	SetConsoleOutputCP(65001);
 #endif
