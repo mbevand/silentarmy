@@ -302,7 +302,7 @@ size_t gpu_solver__extract_valid_solutions(struct gpu_solver *self,
   for (unsigned sol_i = 0; sol_i < self->all_found_sols->nr; sol_i++) {
     nr_valid_sols += verify_sol(self->all_found_sols, sol_i);
   }
-  fprintf(stderr, "%d sol%s\n", nr_valid_sols, nr_valid_sols == 1 ? "" : "s");
+  debug("%d sol%s\n", nr_valid_sols, nr_valid_sols == 1 ? "" : "s");
   debug("Stats: %d likely invalids\n", self->all_found_sols->likely_invalids);
 
   for (uint32_t i = 0; i < self->all_found_sols->nr; i++) {
