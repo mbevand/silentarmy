@@ -48,10 +48,15 @@ def my_ensure_future(coro):
     return task
 
 def parse_url(url):
-    '''Return (host, port) from "stratum+tcp://host:port"'''
+    '''Return (host, port, xnsub) from "stratum+tcp://host:port" optionally
+    postfixed with #xnsub or /#xnsub (in which case xnsub is set to True)'''
     prefix = 'stratum+tcp://'
     if not url.startswith(prefix):
         fatal('Invalid stratum url: %s' % url)
+    xnsub = False
+    if url.endswith('#xnsub'):
+        xnsub = True
+        url = url[:-len('#xnsub')].strip('/')
     url = url[len(prefix):]
     colon = url.rfind(':')
     if colon == -1:
@@ -64,7 +69,7 @@ def parse_url(url):
         port = int(port)
     except ValueError as e:
         fatal('Invalid port number: %s' % port)
-    return (url[:colon], int(url[colon + 1:]))
+    return (url[:colon], int(url[colon + 1:]), xnsub)
 
 def decode_solver_line(line):
     '''Decode a line read from the solver. 3 types of lines exist:
@@ -150,6 +155,7 @@ class Silentarmy:
         self.st_had_job = False
         self.st_protocol = StratumClientProtocol(self)
         self.st_state = 'DISCONNECTED'
+        self.st_extranonce = False
         self.st_id = 0
         self.st_expected_id = None
         self.st_accepted = 0
@@ -169,7 +175,7 @@ class Silentarmy:
         self.total_shares = {}
 
     def init(self):
-        (self.host, self.port) = parse_url(self.opts.pool)
+        (self.host, self.port, self.st_extranonce) = parse_url(self.opts.pool)
         if sys.platform == 'win32':
             # ProactorEventLoop needed to support subprocesses with Python 3.5
             self.loop = asyncio.ProactorEventLoop()
@@ -448,6 +454,8 @@ class Silentarmy:
         '''Generate a stratum message to call the specified method.'''
         if method == 'mining.subscribe':
             p = ["silentarmy", None, self.host, str(self.port)]
+        elif method == 'mining.extranonce.subscribe':
+            p = []
         elif method == 'mining.authorize':
             p = [self.opts.user]
             if self.opts.pwd:
@@ -483,6 +491,14 @@ class Silentarmy:
                 if self.st_state == 'SENT_SUBSCRIBE':
                     # result: [ <ignored>, nonce_leftpart ]
                     self.set_nonce_leftpart(msg['result'][1])
+                    if self.st_extranonce:
+                        self.st_state = 'SENT_EXTRANONCE_SUBSCRIBE'
+                        return self.stratum_msg('mining.extranonce.subscribe')
+                    else:
+                        self.st_state = 'SENT_AUTHORIZE'
+                        return self.stratum_msg('mining.authorize')
+                elif self.st_state == 'SENT_EXTRANONCE_SUBSCRIBE':
+                    # ignore
                     self.st_state = 'SENT_AUTHORIZE'
                     return self.stratum_msg('mining.authorize')
                 elif self.st_state == 'SENT_AUTHORIZE':
@@ -502,6 +518,9 @@ class Silentarmy:
                 if msg['method'] == 'mining.set_target':
                     # params: [ target ]
                     self.set_target(msg['params'][0])
+                elif msg['method'] == 'mining.set_extranonce':
+                    # params: [ nonce_leftpart ]
+                    self.set_nonce_leftpart(msg['params'][0])
                 elif msg['method'] == 'mining.notify':
                     # params: [ job_id, nVersion, hashPrevBlock, hashMerkleRoot,
                     #   hashReserved, nTime, nBits, clean_jobs ]
@@ -552,7 +571,8 @@ def main():
             "-c", "--connect",
             dest="pool", action="store", type="string", metavar="POOL",
             default='stratum+tcp://us1-zcash.flypool.org:3333',
-            help="connect to POOL, for example: stratum+tcp://example.com:1234")
+            help="connect to POOL, for example stratum+tcp://example.com:1234" +
+            " (add \"#xnsub\" to enable extranonce.subscribe)")
     parser.add_option(
             "-u", "--user",
             dest="user", action="store", type="string", metavar="USER",

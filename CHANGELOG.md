@@ -1,3 +1,7 @@
+# Current tip
+
+* Implement mining.extranonce.subscribe (kenshirothefist)
+
 # Version 5 (11 Nov 2016)
 
 * Optimization: major 2x speedup (eXtremal) by storing 8 atomic counters in
