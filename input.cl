@@ -124,11 +124,15 @@ uint ht_store(uint round, __global char *ht, uint i,
     p = ht + row * NR_SLOTS * SLOT_LEN;
     uint rowIdx = row/ROWS_PER_UINT;
     uint rowOffset = BITS_PER_ROW*(row%ROWS_PER_UINT);
-    uint xcnt = atomic_add(rowCounters+rowIdx, 1u<<rowOffset);
+    uint xcnt = atomic_add(rowCounters + rowIdx, 1 << rowOffset);
     xcnt = (xcnt >> rowOffset) & ROW_MASK;
     cnt = xcnt;
     if (cnt >= NR_SLOTS)
+      {
+	// avoid overflows
+	atomic_sub(rowCounters + rowIdx, 1 << rowOffset);
 	return 1;
+      }
     p += cnt * SLOT_LEN + xi_offset_for_round(round);
     // store "i" (always 4 bytes before Xi)
     *(__global uint *)(p - 4) = i;
