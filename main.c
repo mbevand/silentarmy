@@ -365,43 +365,36 @@ void examine_ht(unsigned round, cl_command_queue queue, cl_mem buf_ht)
 	if (round == 1)
 	  {
 	    show |= has_xi(round, ht, row, 0xf0937683, &star);
-	    show |= (row < 256);
 	  }
 	if (round == 2)
 	  {
 	    show |= has_xi(round, ht, row, 0x3519d2e0, &star);
-	    show |= (row < 256);
 	  }
 	if (round == 3)
 	  {
 	    show |= has_xi(round, ht, row, 0xd6950b66, &star);
-	    show |= (row < 256);
 	  }
 	if (round == 4)
 	  {
 	    show |= has_xi(round, ht, row, 0xa92db6ab, &star);
-	    show |= (row < 256);
 	  }
 	if (round == 5)
 	  {
 	    show |= has_xi(round, ht, row, 0x2daaa343, &star);
-	    show |= (row < 256);
 	  }
 	if (round == 6)
 	  {
 	    show |= has_xi(round, ht, row, 0x53b9dd5d, &star);
-	    show |= (row < 256);
 	  }
 	if (round == 7)
 	  {
 	    show |= has_xi(round, ht, row, 0xb9d374fe, &star);
-	    show |= (row < 256);
 	  }
 	if (round == 8)
 	  {
 	    show |= has_xi(round, ht, row, 0x005ae381, &star);
-	    show |= (row < 256);
 	  }
+	// show |= (row < 256);
 	if (show)
 	  {
 	    debug("row %#x:\n", row);
@@ -1349,11 +1342,8 @@ void usage(const char *progname)
 	    "Options are:\n"
             "  -h, --help     display this help and exit\n"
             "  -v, --verbose  print verbose messages\n"
-            "  -i <input>     hex block header to solve; either a 140-byte "
-	    "full header,\n"
-	    "                 or a 108-byte nonceless header with implicit "
-	    "zero nonce\n"
-	    "                 (default: all-zero header)\n"
+            "  -i <input>     140-byte hex block header to solve "
+	    "(default: all-zero header)\n"
             "  --nonces <nr>  number of nonces to try (default: 1)\n"
             "  -n <n>         equihash n param (only supported value is 200)\n"
             "  -k <k>         equihash k param (only supported value is 9)\n"
