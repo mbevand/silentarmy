@@ -486,10 +486,10 @@ size_t select_work_size_blake(void)
     return work_size;
 }
 
-void init_ht(cl_command_queue queue, cl_kernel k_init_ht, cl_mem buf_ht)
+void init_ht(cl_command_queue queue, cl_kernel k_init_ht, cl_mem buf_ht, cl_mem rowCounters)
 {
-    size_t      global_ws = NR_ROWS;
-    size_t      local_ws = 64;
+    size_t      global_ws = NR_ROWS / ROWS_PER_UINT;
+    size_t      local_ws = 256;
     cl_int      status;
 #if 0
     uint32_t    pat = -1;
@@ -502,6 +502,7 @@ void init_ht(cl_command_queue queue, cl_kernel k_init_ht, cl_mem buf_ht)
         fatal("clEnqueueFillBuffer (%d)\n", status);
 #endif
     status = clSetKernelArg(k_init_ht, 0, sizeof (buf_ht), &buf_ht);
+    clSetKernelArg(k_init_ht, 1, sizeof (rowCounters), &rowCounters);
     if (status != CL_SUCCESS)
         fatal("clSetKernelArg (%d)\n", status);
     check_clEnqueueNDRangeKernel(queue, k_init_ht,
@@ -831,12 +832,26 @@ uint32_t verify_sols(cl_command_queue queue, cl_mem buf_sols, uint64_t *nonce,
 **
 ** Return the number of solutions found.
 */
+
+unsigned get_value(unsigned *data, unsigned row)
+{
+
+    return data[row];
+}
+
+unsigned get_value2(unsigned *data, unsigned row)
+{
+    uint rowIdx = row/2;
+    uint rowOffset = 16*(row%2);    
+    return (data[rowIdx] >> rowOffset) & 0xFFFF;
+}
+
 uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
 	cl_kernel k_init_ht, cl_kernel *k_rounds, cl_kernel k_sols,
 	cl_mem *buf_ht, cl_mem buf_sols, cl_mem buf_dbg, size_t dbg_size,
 	uint8_t *header, size_t header_len, char do_increment,
 	size_t fixed_nonce_bytes, uint8_t *target, char *job_id,
-	uint32_t *shares)
+	uint32_t *shares, cl_mem *rowCounters)
 {
     blake2b_state_t     blake;
     cl_mem              buf_blake_st;
@@ -873,34 +888,44 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
       {
 	if (verbose > 1)
 	    debug("Round %d\n", round);
-	if (round < 2)
-	    init_ht(queue, k_init_ht, buf_ht[round % 2]);
+
+  // Now on every round!!!!
+  init_ht(queue, k_init_ht, buf_ht[round % 2], rowCounters[round % 2]);
 	if (!round)
 	  {
 	    check_clSetKernelArg(k_rounds[round], 0, &buf_blake_st);
 	    check_clSetKernelArg(k_rounds[round], 1, &buf_ht[round % 2]);
+      check_clSetKernelArg(k_rounds[round], 2, &rowCounters[round % 2]);
 	    global_ws = select_work_size_blake();
 	  }
 	else
 	  {
 	    check_clSetKernelArg(k_rounds[round], 0, &buf_ht[(round - 1) % 2]);
 	    check_clSetKernelArg(k_rounds[round], 1, &buf_ht[round % 2]);
+      check_clSetKernelArg(k_rounds[round], 2, &rowCounters[(round - 1) % 2]);
+      check_clSetKernelArg(k_rounds[round], 3, &rowCounters[round % 2]);      
 	    global_ws = NR_ROWS;
 	  }
-	check_clSetKernelArg(k_rounds[round], 2, &buf_dbg);
+	check_clSetKernelArg(k_rounds[round], round == 0 ? 3 : 4, &buf_dbg);
 	if (round == PARAM_K - 1)
-	    check_clSetKernelArg(k_rounds[round], 3, &buf_sols);
+	    check_clSetKernelArg(k_rounds[round], 5, &buf_sols);
+
 	check_clEnqueueNDRangeKernel(queue, k_rounds[round], 1, NULL,
 		&global_ws, &local_work_size, 0, NULL, NULL);
+  
 	examine_ht(round, queue, buf_ht[round % 2]);
 	examine_dbg(queue, buf_dbg, dbg_size);
       }
     check_clSetKernelArg(k_sols, 0, &buf_ht[0]);
     check_clSetKernelArg(k_sols, 1, &buf_ht[1]);
     check_clSetKernelArg(k_sols, 2, &buf_sols);
+    check_clSetKernelArg(k_sols, 3, &rowCounters[0]);
+    check_clSetKernelArg(k_sols, 4, &rowCounters[1]);    
     global_ws = NR_ROWS;
+
     check_clEnqueueNDRangeKernel(queue, k_sols, 1, NULL,
 	    &global_ws, &local_work_size, 0, NULL, NULL);
+      
     sol_found = verify_sols(queue, buf_sols, nonce_ptr, header,
 	    fixed_nonce_bytes, target, job_id, shares);
     clReleaseMemObject(buf_blake_st);
@@ -1026,7 +1051,7 @@ void mining_parse_job(char *str, uint8_t *target, size_t target_len,
 void mining_mode(cl_context ctx, cl_command_queue queue,
 	cl_kernel k_init_ht, cl_kernel *k_rounds, cl_kernel k_sols,
 	cl_mem *buf_ht, cl_mem buf_sols, cl_mem buf_dbg, size_t dbg_size,
-	uint8_t *header)
+	uint8_t *header, cl_mem *rowCounters)
 {
     char		line[4096];
     uint8_t		target[SHA256_DIGEST_SIZE];
@@ -1048,8 +1073,8 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
                     header, ZCASH_BLOCK_HEADER_LEN,
                     &fixed_nonce_bytes);
         total += solve_equihash(ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
-                buf_sols, buf_dbg, dbg_size, header, ZCASH_BLOCK_HEADER_LEN, 1,
-                fixed_nonce_bytes, target, job_id, &shares);
+                buf_sols, buf_dbg, dbg_size, header, ZCASH_BLOCK_HEADER_LEN, i,
+                fixed_nonce_bytes, target, job_id, &shares, rowCounters);
         total_shares += shares;
         if ((t1 = now()) > t0 + status_period)
           {
@@ -1064,7 +1089,7 @@ void run_opencl(uint8_t *header, size_t header_len, cl_context ctx,
         cl_command_queue queue, cl_kernel k_init_ht, cl_kernel *k_rounds,
 	cl_kernel k_sols)
 {
-    cl_mem              buf_ht[2], buf_sols, buf_dbg;
+    cl_mem              buf_ht[2], buf_sols, buf_dbg, rowCounters[2];
     void                *dbg = NULL;
 #ifdef ENABLE_DEBUG
     size_t              dbg_size = NR_ROWS * sizeof (debug_t);
@@ -1082,19 +1107,20 @@ void run_opencl(uint8_t *header, size_t header_len, cl_context ctx,
 	    CL_MEM_COPY_HOST_PTR, dbg_size, dbg);
     buf_ht[0] = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, HT_SIZE, NULL);
     buf_ht[1] = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, HT_SIZE, NULL);
-    buf_sols = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof (sols_t),
-	    NULL);
+    buf_sols = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof (sols_t), NULL);
+    rowCounters[0] = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, NR_ROWS, NULL);
+    rowCounters[1] = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, NR_ROWS, NULL);    
     if (mining)
 	mining_mode(ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
-		buf_sols, buf_dbg, dbg_size, header);
+		buf_sols, buf_dbg, dbg_size, header, rowCounters);
     fprintf(stderr, "Running...\n");
     total = 0;
     uint64_t t0 = now();
     // Solve Equihash for a few nonces
     for (nonce = 0; nonce < nr_nonces; nonce++)
 	total += solve_equihash(ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
-		buf_sols, buf_dbg, dbg_size, header, header_len, !!nonce,
-		0, NULL, NULL, NULL);
+		buf_sols, buf_dbg, dbg_size, header, header_len, nonce,
+		0, NULL, NULL, NULL, rowCounters);
     uint64_t t1 = now();
     fprintf(stderr, "Total %" PRId64 " solutions in %.1f ms (%.1f Sol/s)\n",
 	    total, (t1 - t0) / 1e3, total / ((t1 - t0) / 1e6));
@@ -1363,6 +1389,7 @@ void tests(void)
 
 int main(int argc, char **argv)
 {
+//   printf("NR_SLOTS=%u\n", NR_SLOTS);
     uint8_t             header[ZCASH_BLOCK_HEADER_LEN] = {0,};
     uint32_t            header_len;
     char		*hex_header = NULL;
