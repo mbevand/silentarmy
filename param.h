@@ -1,3 +1,6 @@
+#ifndef _PARAM_H_
+#define _PARAM_H_
+
 #define PARAM_N				200
 #define PARAM_K				9
 #define PREFIX                          (PARAM_N / (PARAM_K + 1))
@@ -83,3 +86,5 @@ typedef struct	sols_s
     uchar	valid[MAX_SOLS];
     uint	values[MAX_SOLS][(1 << PARAM_K)];
 }		sols_t;
+
+#endif /* _PARAM_H_ */
