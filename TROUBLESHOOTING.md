@@ -35,17 +35,14 @@ eg. `--use 0,1,2`.
 
 ## Correct results
 
-Verify that `make test` reports valid Equihash solutions for 100 different
-blocks:
+Verify that `make test` succeeds. It should take between 5 and 60 seconds
+depending on your GPU:
 
 ```
 $ make test
-./sa-solver --nonces 100 -v -v 2>&1 | grep Soln: | \
-    diff -u testing/sols-100 - | cut -c 1-75
+Testing...
+Test: success
 ```
-
-It should output nothing else. If you see a bunch of lines with numbers,
-something is wrong with your hardware and/or drivers.
 
 ## Sustained operation on one device
 
@@ -85,13 +82,16 @@ Verify that the number of shares increases over time.
 
 ## Performance
 
-Not achieving the performance you expected?
+Not reaching the sol/s performance you expected?
 
+* Try running a different number of instances using the `silentarmy --instances
+  N` argument. Try 1, 2, 3, or more. Note that each instance requires 805 MB of
+  GPU memory.
+* If 1 instance still requires more GPU memory than available, edit `param.h`
+  and set `NR_ROWS_LOG` to `19` (this reduces the per-instance memory usage
+  to 671 MB) and run with `--instances 1`.
 * By default SILENTARMY mines with only one device/GPU; make sure to specify
   all the GPUs in the `--use` option, for example `silentarmy --use 0,1,2`
   if the host has three devices with IDs 0, 1, and 2.
-* If a GPU has less than 2 GB of GPU memory, run `silentarmy --instances 1`
-  (1 instance uses ~0.8 GB of memory, 2 instances use ~1.6 GB of memory.)
-* If 1 instance still requires too much memory, edit `param.h` and set
-  `NR_ROWS_LOG` to `19` (this reduces the per-instance memory usage to ~670 MB)
-  and run with `--instances 1`.
+* Update your graphics card driver. The OpenCL compiler comes with the driver
+  and occasionally new driver versions significantly tweak or improve it.

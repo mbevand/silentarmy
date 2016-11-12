@@ -60,6 +60,9 @@ Options:
 * 75 sol/s with one RX 480 8GB
 * 70 sol/s with one GTX 1070
 
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md#performance) to resolve performance
+issues.
+
 Note: the `silentarmy` **miner** automatically achieves this performance level,
 however the `sa-solver` **command-line solver** by design runs only 1 instance
 of the Equihash proof-of-work algorithm causing it to slightly underperform by
