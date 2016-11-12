@@ -83,9 +83,9 @@ and statistics in progressively more and more details.
 
 # Performance
 
-* 115.0 sol/s with one R9 Nano
-* 75.0 sol/s with one RX 480 8GB
-* (TODO: add Nvidia performance numbers)
+* 115 sol/s with one R9 Nano
+* 75 sol/s with one RX 480 8GB
+* 70 sol/s with one GTX 1070
 
 Note: the `silentarmy` **miner** automatically achieves this performance level,
 however the `sa-solver` **command-line solver** by design runs only 1 instance
@@ -93,26 +93,20 @@ of the Equihash proof-of-work algorithm causing it to slightly underperform by
 5-10%. One must manually run 2 instances of `sa-solver` (eg. in 2 terminal
 consoles) to achieve the same performance level as the `silentarmy` **miner**.
 
-# Dependencies
+# Compilation and installation
 
-SILENTARMY has only one build dependency: an OpenCL implementation. And it
-has only one runtime dependency: Python 3.3 or later (needed to support the
-use of the `yield from` syntax.)
+The steps below describe how to obtain the dependencies needed by SILENTARMY,
+how to compile it, and how to install it.
 
-When running on AMD GPUs, install the **AMD APP SDK** (OpenCL implementation)
-and either:
-* the **AMDGPU-PRO** driver (amdgpu.ko, for newer GPUs), or
-* the **Radeon Software Crimson Edition** driver (fglrx.ko, for older GPUs)
+## Step 1: OpenCL
 
-When running on Nvidia GPUs, install the Nvidia OpenCL development files,
-and their binary driver.
+OpenCL support comes with the graphic card driver. Read the appropriate
+subsection below:
 
-Instructions are provided below for a few Linux versions.
-
-## Ubuntu 16.04 / amdgpu
+### Ubuntu 16.04 / amdgpu
 
 1. Download the [AMDGPU-PRO Driver](http://support.amd.com/en-us/kb-articles/Pages/AMDGPU-PRO-Install.aspx)
-(as of 30 Oct 2016, the latest version is 16.40)
+(as of 30 Oct 2016, the latest version is 16.40).
 
 2. Extract it:
    `$ tar xf amdgpu-pro-16.40-348864.tar.xz`
@@ -132,20 +126,18 @@ Instructions are provided below for a few Linux versions.
    `$ tar xf AMD-APP-SDKInstaller-v3.0.130.136-GA-linux64.tar.bz2`
 
 8. Install system-wide by running as root (accept all the default options):
-  `$ sudo ./AMD-APP-SDK-v3.0.130.136-GA-linux64.sh`
+   `$ sudo ./AMD-APP-SDK-v3.0.130.136-GA-linux64.sh`
 
-9. Install compiler dependencies in order to compile SILENTARMY:
-  `$ sudo apt-get install build-essential`
+### Ubuntu 14.04 / fglrx
 
-## Ubuntu 14.04 / fglrx
-
-1. Install the official Ubuntu package:
+1. Install the official Ubuntu package for the **Radeon Software Crimson
+   Edition** driver:
    `$ sudo apt-get install fglrx`
    (as of 30 Oct 2016, the latest version is 2:15.201-0ubuntu0.14.04.1)
 
-2. Follow steps 5-9 above.
+2. Follow steps 5-8 above.
 
-## Ubuntu 16.04 / Nvidia
+### Ubuntu 16.04 / Nvidia
 
 1. Install the OpenCL development files and the latest driver:
    `$ sudo apt-get install nvidia-opencl-dev nvidia-361`
@@ -156,11 +148,31 @@ Instructions are provided below for a few Linux versions.
 3. Install compiler dependencies in order to compile SILENTARMY:
   `$ sudo apt-get install build-essential`
 
-## Arch Linux
+## Step 2: Python 3.3
 
-1. Install the [silentarmy AUR package](https://aur.archlinux.org/packages/silentarmy/).
+1. SILENTARMY requires Python 3.3 or later (needed to support the use of the
+   `yield from` syntax). On Ubuntu/Debian systems:
+   `$ sudo apt-get install python3`
 
-# Compilation and installation
+2. Verify the Python version is 3.3 or later:
+   `$ python3 -V`
+
+## Step 3: C compiler
+
+1. A C compiler is needed to compile the SILENTARMY solver binary (`sa-solver`):
+   `$ sudo apt-get install build-essential`
+
+## Step 4: Get SILENTARMY
+
+Download it as a ZIP from github: https://github.com/mbevand/silentarmy/archive/master.zip
+
+Or clone it from the command line:
+`$ git clone https://github.com/mbevand/silentarmy.git`
+
+Or, for Arch Linux users, get the
+[silentarmy AUR package](https://aur.archlinux.org/packages/silentarmy/).
+
+## Step 5: Compile and install
 
 Compiling SILENTARMY is easy:
 
