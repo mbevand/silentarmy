@@ -54,33 +54,6 @@ Options:
   -p PWD, --pwd=PWD     password for connecting to the pool
 ```
 
-# Equihash solver
-
-SILENTARMY also provides a command line Equihash solver (`sa-solver`)
-implementing the CLI API described in the
-[Zcash open source miner challenge](https://zcashminers.org/rules).
-To solve a specific block header and print the encoded solution on stdout, run
-the following command (this header is from
-[mainnet block #3400](https://explorer.zcha.in/blocks/00000001687e89e7e1ce48b349e601c89c70dd4c268fdf24b269a3ca4140426f)
-and should result in 1 Equihash solution):
-
-```
-$ sa-solver -i 04000000e54c27544050668f272ec3b460e1cde745c6b21239a81dae637fde4704000000844bc0c55696ef9920eeda11c1eb41b0c2e7324b46cc2e7aa0c2aa7736448d7a000000000000000000000000000000000000000000000000000000000000000068241a587e7e061d250e000000000000010000000000000000000000000000000000000000000000
-```
-
-If the option `-i` is not specified, `sa-solver` solves a 140-byte header of all
-zero bytes. The option `--nonces <nr>` instructs the program to try multiple
-nonces, each time incrementing the nonce by 1. So a convenient way to run a
-quick test/benchmark is simply:
-
-`$ sa-solver --nonces 100`
-
-Note: due to BLAKE2b optimizations in my implementation, if the header is
-specified it must be 140 bytes and its last 12 bytes **must** be zero.
-
-Use the verbose (`-v`) and very verbose (`-v -v`) options to show the solutions
-and statistics in progressively more and more details.
-
 # Performance
 
 * 115 sol/s with one R9 Nano
@@ -135,7 +108,7 @@ subsection below:
    `$ sudo apt-get install fglrx`
    (as of 30 Oct 2016, the latest version is 2:15.201-0ubuntu0.14.04.1)
 
-2. Follow steps 5-8 above.
+2. Follow steps 5-8 above: reboot, install the AMD APP SDK...
 
 ### Ubuntu 16.04 / Nvidia
 
@@ -143,10 +116,7 @@ subsection below:
    `$ sudo apt-get install nvidia-opencl-dev nvidia-361`
 
 2. Either reboot, or load the kernel driver:
-   `$ modprobe nvidia_361`
-
-3. Install compiler dependencies in order to compile SILENTARMY:
-  `$ sudo apt-get install build-essential`
+   `$ sudo modprobe nvidia_361`
 
 ## Step 2: Python 3.3
 
@@ -193,6 +163,33 @@ solutions which is less than 1% off the theoretical expected average number of
 solutions of 1.88 per Equihash run at (n,k)=(200,9).
 
 For installing, just copy `silentarmy` and `sa-solver` to the same directory.
+
+# Equihash solver
+
+SILENTARMY also provides a command line Equihash solver (`sa-solver`)
+implementing the CLI API described in the
+[Zcash open source miner challenge](https://zcashminers.org/rules).
+To solve a specific block header and print the encoded solution on stdout, run
+the following command (this header is from
+[mainnet block #3400](https://explorer.zcha.in/blocks/00000001687e89e7e1ce48b349e601c89c70dd4c268fdf24b269a3ca4140426f)
+and should result in 1 Equihash solution):
+
+```
+$ sa-solver -i 04000000e54c27544050668f272ec3b460e1cde745c6b21239a81dae637fde4704000000844bc0c55696ef9920eeda11c1eb41b0c2e7324b46cc2e7aa0c2aa7736448d7a000000000000000000000000000000000000000000000000000000000000000068241a587e7e061d250e000000000000010000000000000000000000000000000000000000000000
+```
+
+If the option `-i` is not specified, `sa-solver` solves a 140-byte header of all
+zero bytes. The option `--nonces <nr>` instructs the program to try multiple
+nonces, each time incrementing the nonce by 1. So a convenient way to run a
+quick test/benchmark is simply:
+
+`$ sa-solver --nonces 100`
+
+Note: due to BLAKE2b optimizations in my implementation, if the header is
+specified it must be 140 bytes and its last 12 bytes **must** be zero.
+
+Use the verbose (`-v`) and very verbose (`-v -v`) options to show the solutions
+and statistics in progressively more and more details.
 
 # Implementation details
 
