@@ -32,7 +32,7 @@ uint64_t	nr_nonces = 1;
 uint32_t	do_list_devices = 0;
 uint32_t	gpu_to_use = 0;
 uint32_t	mining = 0;
-struct timespec kern_avg_run_time;
+double      kern_avg_run_time = 0;
 
 typedef struct  debug_s
 {
@@ -115,17 +115,22 @@ void randomize(void *p, ssize_t l)
 	fatal("close %s: %s\n", fname, strerror(errno));
 }
 
-struct timespec time_diff(struct timespec start, struct timespec end)
+
+#define NSEC 1e-9
+double timespec_to_double(struct timespec *t)
 {
-	struct timespec temp;
-	if ((end.tv_nsec-start.tv_nsec)<0) {
-		temp.tv_sec = end.tv_sec-start.tv_sec-1;
-		temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
-	} else {
-		temp.tv_sec = end.tv_sec-start.tv_sec;
-		temp.tv_nsec = end.tv_nsec-start.tv_nsec;
-	}
-	return temp;
+    return ((double)t->tv_sec) + ((double) t->tv_nsec) * NSEC;
+}
+
+void double_to_timespec(double dt, struct timespec *t)
+{
+    t->tv_sec = (long)dt;
+    t->tv_nsec = (long)((dt - t->tv_sec) / NSEC);
+}
+
+void get_time(struct timespec *t)
+{
+	clock_gettime(CLOCK_MONOTONIC, t);
 }
 
 cl_mem check_clCreateBuffer(cl_context ctx, cl_mem_flags flags, size_t size,
@@ -791,7 +796,7 @@ uint32_t verify_sol(sols_t *sols, unsigned sol_i)
 */
 uint32_t verify_sols(cl_command_queue queue, cl_mem buf_sols, uint64_t *nonce,
 	uint8_t *header, size_t fixed_nonce_bytes, uint8_t *target,
-	char *job_id, uint32_t *shares, struct timespec *start_time)
+	char *job_id, uint32_t *shares, struct timespec *target_time)
 {
     sols_t	*sols;
     uint32_t	nr_valid_sols;
@@ -799,30 +804,52 @@ uint32_t verify_sols(cl_command_queue queue, cl_mem buf_sols, uint64_t *nonce,
     if (!sols)
 		fatal("malloc: %s\n", strerror(errno));
 
-	nanosleep(&kern_avg_run_time, NULL);
+	cl_event readEvent;
     check_clEnqueueReadBuffer(queue, buf_sols,
-	    CL_TRUE,	// cl_bool	blocking_read
+	    CL_FALSE,	// cl_bool	blocking_read
 	    0,		// size_t	offset
 	    sizeof (*sols),	// size_t	size
 	    sols,	// void		*ptr
 	    0,		// cl_uint	num_events_in_wait_list
 	    NULL,	// cl_event	*event_wait_list
-	    NULL);	// cl_event	*event
-	struct timespec curr_time;
-	clock_gettime(CLOCK_MONOTONIC, &curr_time);
+	    &readEvent);	// cl_event	*event
+    clFlush(queue);
 
-	struct timespec t_diff = time_diff(*start_time, curr_time);
+    struct timespec start_time;
+    get_time(&start_time);
 
-	double a_diff = t_diff.tv_sec * 1e9 + t_diff.tv_nsec;
-	double kern_avg = kern_avg_run_time.tv_sec * 1e9 +  kern_avg_run_time.tv_nsec;
-	if (kern_avg == 0)
-	kern_avg = a_diff;
-	else
-	kern_avg = kern_avg * 70 / 100 + a_diff * 28 / 100; // it is 2% less than average
-	// thus allowing time to reduce
+    double dtarget = timespec_to_double(target_time);
 
-	kern_avg_run_time.tv_sec = (time_t)(kern_avg / 1e9);
-	kern_avg_run_time.tv_nsec = ((long)kern_avg) % 1000000000;
+    cl_int readStatus;
+    clGetEventInfo(readEvent, CL_EVENT_COMMAND_EXECUTION_STATUS, sizeof(cl_int),
+        &readStatus, NULL);
+    while(readStatus != CL_COMPLETE)
+    {
+        struct timespec t;
+        get_time(&t);
+        double dt = timespec_to_double(&t);
+        double delta = dtarget - dt;
+        if (delta < 0)
+            break;
+
+        double_to_timespec(delta * SLEEP_RECHECK_RATIO, &t);
+        nanosleep(&t, NULL);
+
+        clGetEventInfo(readEvent, CL_EVENT_COMMAND_EXECUTION_STATUS, sizeof(cl_int),
+            &readStatus, NULL);
+    }
+    clWaitForEvents(1, &readEvent);
+
+	struct timespec end_time;
+    get_time(&end_time);
+
+    double dstart, dend, delta;
+    dstart = timespec_to_double(&start_time);
+    dend = timespec_to_double(&end_time);
+
+    delta = dend - dstart;
+    kern_avg_run_time = kern_avg_run_time * 6.0 / 10.0 + delta * ((4.0 / 10.0));
+    kern_avg_run_time *= (1 - SLEEP_SKIP_RATIO);
 
     if (sols->nr > MAX_SOLS)
       {
@@ -938,13 +965,19 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
     check_clSetKernelArg(k_sols, 4, &rowCounters[1]);
     global_ws = NR_ROWS;
 
-	struct timespec start_time;
-	clock_gettime(CLOCK_MONOTONIC, &start_time);
+    struct timespec start_time, target_time;
+    get_time(&start_time);
+
+    double dstart, dtarget = 0;
+    dstart = timespec_to_double(&start_time);
+    dtarget = dstart + kern_avg_run_time;
+    double_to_timespec(dtarget, &target_time);
+
     check_clEnqueueNDRangeKernel(queue, k_sols, 1, NULL,
 	    &global_ws, &local_work_size, 0, NULL, NULL);
-	clFlush(queue);
+    clFlush(queue);
     sol_found = verify_sols(queue, buf_sols, nonce_ptr, header,
-	    fixed_nonce_bytes, target, job_id, shares, &start_time);
+	    fixed_nonce_bytes, target, job_id, shares, &target_time);
     clReleaseMemObject(buf_blake_st);
     return sol_found;
 }
