@@ -59,9 +59,12 @@ uint32_t	do_list_devices = 0;
 uint32_t	gpu_to_use = 0;
 uint32_t	mining = 0;
 #ifdef WIN32
-#define timespec timeval
-#endif
+LARGE_INTEGER pc_freq;
+LONGLONG kern_avg_run_time = 0;
+#else
 struct timespec kern_avg_run_time;
+#endif
+
 
 typedef struct  debug_s
 {
@@ -152,18 +155,10 @@ void randomize(void *p, ssize_t l)
 #endif
 }
 
+#ifndef WIN32
 struct timespec time_diff(struct timespec start, struct timespec end)
 {
 	struct timespec temp;
-#ifdef WIN32
-	if ((end.tv_usec - start.tv_usec)<0) {
-		temp.tv_sec = end.tv_sec-start.tv_sec-1;
-		temp.tv_usec = 1000000 + end.tv_usec - start.tv_usec;
-	} else {
-		temp.tv_sec = end.tv_sec-start.tv_sec;
-		temp.tv_usec = end.tv_usec - start.tv_usec;
-	}
-#else
 	if ((end.tv_nsec-start.tv_nsec)<0) {
 		temp.tv_sec = end.tv_sec-start.tv_sec-1;
 		temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
@@ -171,10 +166,9 @@ struct timespec time_diff(struct timespec start, struct timespec end)
 		temp.tv_sec = end.tv_sec-start.tv_sec;
 		temp.tv_nsec = end.tv_nsec-start.tv_nsec;
 	}
-#endif
 	return temp;
 }
-
+#endif
 cl_mem check_clCreateBuffer(cl_context ctx, cl_mem_flags flags, size_t size,
 	void *host_ptr)
 {
@@ -842,7 +836,13 @@ uint32_t verify_sol(sols_t *sols, unsigned sol_i)
 */
 uint32_t verify_sols(cl_command_queue queue, cl_mem buf_sols, uint64_t *nonce,
 	uint8_t *header, size_t fixed_nonce_bytes, uint8_t *target,
-	char *job_id, uint32_t *shares, struct timespec *start_time)
+	char *job_id, uint32_t *shares,
+#ifdef WIN32
+    LARGE_INTEGER *start_time
+#else
+    struct timespec *start_time
+#endif
+)
 {
     sols_t	*sols;
     uint32_t	nr_valid_sols;
@@ -850,10 +850,9 @@ uint32_t verify_sols(cl_command_queue queue, cl_mem buf_sols, uint64_t *nonce,
     if (!sols)
 		fatal("malloc: %s\n", strerror(errno));
 #ifdef WIN32
-	printf("sleep: %llu, %llu\n", kern_avg_run_time.tv_sec, kern_avg_run_time.tv_usec);
-	Sleep(kern_avg_run_time.tv_sec * 1000 + kern_avg_run_time.tv_usec / 1000);
+    Sleep(kern_avg_run_time * 1000 / pc_freq.QuadPart);
 #else
-	nanosleep(&kern_avg_run_time, NULL);
+    nanosleep(&kern_avg_run_time, NULL);
 #endif
     check_clEnqueueReadBuffer(queue, buf_sols,
 	    CL_TRUE,	// cl_bool	blocking_read
@@ -863,31 +862,25 @@ uint32_t verify_sols(cl_command_queue queue, cl_mem buf_sols, uint64_t *nonce,
 	    0,		// cl_uint	num_events_in_wait_list
 	    NULL,	// cl_event	*event_wait_list
 	    NULL);	// cl_event	*event
-	struct timespec curr_time;
-#ifdef WIN32
-	gettimeofday(&curr_time, NULL);
-#else
-	clock_gettime(CLOCK_MONOTONIC, &curr_time);
-#endif
 
-	struct timespec t_diff = time_diff(*start_time, curr_time);
 #ifdef WIN32
-	double a_diff = t_diff.tv_sec * 1e6 + t_diff.tv_usec;
-	double kern_avg = kern_avg_run_time.tv_sec * 1e6 + kern_avg_run_time.tv_usec;
+	LARGE_INTEGER curr_time;
+	QueryPerformanceCounter(&curr_time);
+	LONGLONG a_diff = curr_time.QuadPart - start_time->QuadPart;
+	kern_avg_run_time = (kern_avg_run_time == 0) ? a_diff : (kern_avg_run_time * 70 / 100 + a_diff * 28 / 100);
 #else
+	struct timespec curr_time;
+	clock_gettime(CLOCK_MONOTONIC, &curr_time)
+	LONGLONG t_diff = time_diff(&start_time, curr_time);
 	double a_diff = t_diff.tv_sec * 1e9 + t_diff.tv_nsec;
 	double kern_avg = kern_avg_run_time.tv_sec * 1e9 + kern_avg_run_time.tv_nsec;
-#endif
+
 	if (kern_avg == 0)
 	kern_avg = a_diff;
 	else
 	kern_avg = kern_avg * 70 / 100 + a_diff * 28 / 100; // it is 2% less than average
 	// thus allowing time to reduce
 
-#ifdef WIN32
-	kern_avg_run_time.tv_sec = (time_t)(kern_avg / 1e6);
-	kern_avg_run_time.tv_usec = ((long)kern_avg) % 1000000;
-#else
 	kern_avg_run_time.tv_sec = (time_t)(kern_avg / 1e9);
 	kern_avg_run_time.tv_nsec = ((long)kern_avg) % 1000000000;
 #endif
@@ -1005,10 +998,11 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
     check_clSetKernelArg(k_sols, 4, &rowCounters[1]);
     global_ws = NR_ROWS;
 
-	struct timespec start_time;
 #ifdef WIN32
-	gettimeofday(&start_time, NULL);
+	LARGE_INTEGER start_time;
+	QueryPerformanceCounter(&start_time);
 #else
+	struct timespec start_time;
 	clock_gettime(CLOCK_MONOTONIC, &start_time);
 #endif
     check_clEnqueueNDRangeKernel(queue, k_sols, 1, NULL,
@@ -1178,10 +1172,10 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
     puts("SILENTARMY mining mode ready");
     fflush(stdout);
 #ifdef WIN32
-	TIMEVAL t;
-	gettimeofday(&t, NULL);
-	srand(t.tv_usec * t.tv_sec);
-	SetConsoleOutputCP(65001);
+    TIMEVAL t;
+    gettimeofday(&t, NULL);
+    srand(t.tv_usec * t.tv_sec);
+    SetConsoleOutputCP(65001);
 #endif
 
     for (i = 0; ; i++)
@@ -1558,6 +1552,9 @@ int main(int argc, char **argv)
                 fatal("Try '%s --help'\n", argv[0]);
                 break ;
           }
+#ifdef WIN32
+    QueryPerformanceFrequency(&pc_freq);
+#endif
     tests();
     if (mining)
 	puts("SILENTARMY mining mode ready"), fflush(stdout);
