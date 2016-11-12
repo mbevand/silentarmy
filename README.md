@@ -76,29 +76,22 @@ quick test/benchmark is simply:
 `$ sa-solver --nonces 100`
 
 Note: due to BLAKE2b optimizations in my implementation, if the header is
-specified it must be 140 bytes and its last 12 bytes **must** be zero. For
-convenience, `-i` can also specify a 108-byte nonceless header to which
-`sa-solver` adds an implicit nonce of 32 zero bytes.
+specified it must be 140 bytes and its last 12 bytes **must** be zero.
 
 Use the verbose (`-v`) and very verbose (`-v -v`) options to show the solutions
 and statistics in progressively more and more details.
 
 # Performance
 
-* 47.5 sol/s with one R9 Nano
-* 45.0 sol/s with one R9 290X
-* 41.0 sol/s with one RX 480 8GB
-* 30.5 sol/s with one GTX Titan X (Maxwell)
-* 30.5 sol/s with one GTX Titan (Kepler)
+* 115.0 sol/s with one R9 Nano
+* 75.0 sol/s with one RX 480 8GB
+* (TODO: add Nvidia performance numbers)
 
 Note: the `silentarmy` **miner** automatically achieves this performance level,
 however the `sa-solver` **command-line solver** by design runs only 1 instance
-of the Equihash proof-of-work algorithm causing it to underperform. One must
-manually run 2 instances of `sa-solver` (eg. in 2 terminal consoles) to
-achieve the same performance level as the `silentarmy` **miner**.
-
-For a potential performance speedup, set `OPTIM_SIMPLIFY_ROUND` to 1,
-see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+of the Equihash proof-of-work algorithm causing it to slightly underperform by
+5-10%. One must manually run 2 instances of `sa-solver` (eg. in 2 terminal
+consoles) to achieve the same performance level as the `silentarmy` **miner**.
 
 # Dependencies
 
@@ -173,25 +166,10 @@ Compiling SILENTARMY is easy:
 
 `$ make`
 
-## Mac OS
-1. Install Xcode and Xcode Commandline tools
- ``$ xcode-select --install``
-2. Install python 3
- ``$ brew install python3``
- or
-`$ sudo port install python3` 
-3. Checkout the repository
- ``$ git clone https://github.com/justvanbloom/silentarmy.git``
-4. Compile the Binary using
- `$ make`
-5. Test if it works
-`$ make test`
-
-
 You may need to specify the paths to the locations of your OpenCL C headers
-and libOpenCL.so if the compiler does not find them:
+and libOpenCL.so if the compiler does not find them, eg.:
 
-`$ make OPENCL_HEADERS=/path/here LIBOPENCL=/path/there`
+`$ make OPENCL_HEADERS=/usr/local/cuda-8.0/targets/x86_64-linux/include LIBOPENCL=/usr/local/cuda-8.0/targets/x86_64-linux/lib`
 
 Self-testing the command-line solver (solves 100 all-zero 140-byte blocks with
 their nonces varying from 0 to 99):
@@ -256,6 +234,8 @@ almost certainly bits 180-199), this is also discarded as a likely invalid
 solution because this is statistically guaranteed to be all inputs repeated
 at least once. This check is implemented in `kernel_sols()` (see
 `likely_invalids`.)
+* When input references are expanded on-GPU by `expand_refs()`, the code
+checks if the last (512th) input is repeated at least once.
 * Finally when the GPU returns potential solutions, the CPU also checks for
 invalid solutions with duplicate inputs. This check is implemented in
 `verify_sol()`.
@@ -273,8 +253,11 @@ Donations welcome: t1cVviFvgJinQ4w3C2m2CfRxgP5DnHYaoFC
 
 I would like to thank these persons for their contributions to SILENTARMY,
 in alphabetical order:
+* eXtremal
+* kenshirothefist
 * lhl
 * nerdralph
+* poiuty
 * solardiz
 
 # License

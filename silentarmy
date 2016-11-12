@@ -48,10 +48,15 @@ def my_ensure_future(coro):
     return task
 
 def parse_url(url):
-    '''Return (host, port) from "stratum+tcp://host:port"'''
+    '''Return (host, port, xnsub) from "stratum+tcp://host:port" optionally
+    postfixed with #xnsub or /#xnsub (in which case xnsub is set to True)'''
     prefix = 'stratum+tcp://'
     if not url.startswith(prefix):
         fatal('Invalid stratum url: %s' % url)
+    xnsub = False
+    if url.endswith('#xnsub'):
+        xnsub = True
+        url = url[:-len('#xnsub')].strip('/')
     url = url[len(prefix):]
     colon = url.rfind(':')
     if colon == -1:
@@ -64,7 +69,7 @@ def parse_url(url):
         port = int(port)
     except ValueError as e:
         fatal('Invalid port number: %s' % port)
-    return (url[:colon], int(url[colon + 1:]))
+    return (url[:colon], int(url[colon + 1:]), xnsub)
 
 def decode_solver_line(line):
     '''Decode a line read from the solver. 3 types of lines exist:
@@ -145,10 +150,12 @@ class Silentarmy:
         self.solver_procs = {}
         self.solver_binary = os.path.join(sys.path[0], 'sa-solver')
         # Stratum-related attributes
+        self.st_transport = None
         self.st_conn_attempt = 0
         self.st_had_job = False
         self.st_protocol = StratumClientProtocol(self)
         self.st_state = 'DISCONNECTED'
+        self.st_extranonce = False
         self.st_id = 0
         self.st_expected_id = None
         self.st_accepted = 0
@@ -168,7 +175,7 @@ class Silentarmy:
         self.total_shares = {}
 
     def init(self):
-        (self.host, self.port) = parse_url(self.opts.pool)
+        (self.host, self.port, self.st_extranonce) = parse_url(self.opts.pool)
         if sys.platform == 'win32':
             # ProactorEventLoop needed to support subprocesses with Python 3.5
             self.loop = asyncio.ProactorEventLoop()
@@ -194,7 +201,7 @@ class Silentarmy:
         coro = self.loop.create_connection(lambda: self.st_protocol,
                 self.host, self.port)
         try:
-            yield from coro
+            (self.st_transport, _) = yield from coro
         except Exception as e:
             print("Stratum: error connecting: %s" % e)
             my_ensure_future(self.reconnect())
@@ -484,9 +491,8 @@ class Silentarmy:
                 if self.st_state == 'SENT_SUBSCRIBE':
                     # result: [ <ignored>, nonce_leftpart ]
                     self.set_nonce_leftpart(msg['result'][1])
-                    if self.opts.extranonce_subscribe or re.match(r'equihash.*.nicehash.com', self.host):
+                    if self.st_extranonce:
                         self.st_state = 'SENT_EXTRANONCE_SUBSCRIBE'
-                        verbose("mining.extranonce.subscribe enabled")
                         return self.stratum_msg('mining.extranonce.subscribe')
                     else:
                         self.st_state = 'SENT_AUTHORIZE'
@@ -513,13 +519,17 @@ class Silentarmy:
                     # params: [ target ]
                     self.set_target(msg['params'][0])
                 elif msg['method'] == 'mining.set_extranonce':
-                    # params: [ target ]
+                    # params: [ nonce_leftpart ]
                     self.set_nonce_leftpart(msg['params'][0])
                 elif msg['method'] == 'mining.notify':
                     # params: [ job_id, nVersion, hashPrevBlock, hashMerkleRoot,
                     #   hashReserved, nTime, nBits, clean_jobs ]
                     self.set_new_job(*msg['params'][:8])
                     self.update_mining_job()
+                elif msg['method'] == 'client.reconnect':
+                    print("Stratum server forcing a reconnection")
+                    self.st_transport.close()
+                    # reconnection will happen automatically in connection_lost()
                 else:
                     raise Exception('Unimplemented method: %s' % msg['method'])
             else:
@@ -549,32 +559,30 @@ def main():
     parser.add_option(
             "--use",
             dest="use", action="store", type="string", metavar="LIST",
-            default='0',
+            default='1',
             help="use specified GPU device IDs to mine, for example to use " +
-            "the first three: 0,1,2 (default: 0)")
+            "the first three: 0,1,2 (default: 1)")
     parser.add_option(
             "--instances",
             dest="instances", action="store", type="int", metavar="N",
-            default=2,
-            help="run N instances of Equihash per GPU (default: 2)")
+            default=1,
+            help="run N instances of Equihash per GPU (default: 1)")
     parser.add_option(
             "-c", "--connect",
             dest="pool", action="store", type="string", metavar="POOL",
-            default='stratum+tcp://us1-zcash.flypool.org:3333',
-            help="connect to POOL, for example: stratum+tcp://example.com:1234")
+            default='stratum+tcp://equihash.eu.nicehash.com:3357#xnsub',
+            help="connect to POOL, for example stratum+tcp://equihash.eu.nicehash.com:3357#xnsub" +
+            " (add \"#xnsub\" to enable extranonce.subscribe)")
     parser.add_option(
             "-u", "--user",
             dest="user", action="store", type="string", metavar="USER",
-            default="t1cVviFvgJinQ4w3C2m2CfRxgP5DnHYaoFC",
+            default="1GaGRtcCjb7ThaDgDLjgVwV8fctzEf12ct.donate",
             help="username for connecting to the pool")
     parser.add_option(
             "-p", "--pwd",
             dest="pwd", action="store", type="string", metavar="PWD",
+            default='x',
             help="password for connecting to the pool")
-    parser.add_option(
-            "--extranonce-subscribe",
-            dest="extranonce_subscribe", action="store_true",
-            help="Enable 'extranonce' stratum subscribe")
     (opts, args) = parser.parse_args()
     if args:
         parser.error("Extraneous arguments found on command line")
@@ -587,8 +595,6 @@ def main():
         fatal("Invalid syntax for --use: %s" % opts.use)
     if opts.instances < 1:
         fatal("The number of instances per GPU should be 1 or greater")
-
-
     Silentarmy(opts).run()
 
 if __name__ == "__main__":

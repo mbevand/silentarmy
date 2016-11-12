@@ -1,5 +1,26 @@
 # Current tip
 
+* Implement mining.extranonce.subscribe (kenshirothefist)
+* Optimization: +10% speedup, increase collision items tracked per thread
+  (nerdralph). 'make test' finds 196 sols again.
+
+# Version 5 (11 Nov 2016)
+
+* Optimization: major 2x speedup (eXtremal) by storing 8 atomic counters in
+  1 uint, and by reducing branch divergence when iterating over and XORing Xi's.
+  Note that as a result of these optimizations, sa-solver compiled with
+  NR_ROWS_LOG=20 now only finds 182 out of 196 existing solutions ("make test"
+  verification data was adjusted accordingly)
+* Defaulting OPTIM_SIMPLIFY_ROUND to 1; GPU memory usage down to 0.8 GB per
+  instance
+* Optimization: significantly reduce CPU usage and PCIe bandwidth (before:
+  ~100 MB/s/GPU, after: 0.5 MB/s/GPU), accomplished by filtering invalid
+  solutions on-device
+* Optimization: reduce size of collisions[] array; +7% speed increase measured
+  on RX 480 and R9 Nano using AMDGPU-PRO 16.40
+* Implement stratum method client.reconnect
+* Avoid segfault when encountering an out-of-range input
+* For simplicity `-i <header>` now only accepts 140-byte headers
 * Update README.md with Nvidia performance numbers
 * Fix mining on Xeon Phi and CPUs (fix OpenCL warnings)
 * Fix compilation warnings and 32-bit platforms

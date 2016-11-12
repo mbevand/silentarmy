@@ -9,7 +9,10 @@
 #define NR_ROWS_LOG                     20
 
 // Setting this to 1 might make SILENTARMY faster, see TROUBLESHOOTING.md
-#define OPTIM_SIMPLIFY_ROUND			0
+#define OPTIM_SIMPLIFY_ROUND		1
+
+// Number of collision items to track, per thread
+#define COLL_DATA_SIZE_PER_TH		(NR_SLOTS * 5)
 
 // Make hash tables OVERHEAD times larger than necessary to store the average
 // number of elements per row. The ideal value is as small as possible to
@@ -23,6 +26,7 @@
 // Even (as opposed to odd) values of OVERHEAD sometimes significantly decrease
 // performance as they cause VRAM channel conflicts.
 #if NR_ROWS_LOG == 16
+#error "NR_ROWS_LOG = 16 is currently broken - do not use"
 #define OVERHEAD                        3
 #elif NR_ROWS_LOG == 18
 #define OVERHEAD                        3
@@ -62,13 +66,23 @@
 // instructions. 10 is the max supported by the hw.
 #define BLAKE_WPS               	10
 // Maximum number of solutions reported by kernel to host
-#define MAX_SOLS			2000
+#define MAX_SOLS			10
 // Length of SHA256 target
 #define SHA256_TARGET_LEN               (256 / 8)
 
+#if (NR_SLOTS < 16)
+#define BITS_PER_ROW 4
+#define ROWS_PER_UINT 8
+#define ROW_MASK 0x0F
+#else
+#define BITS_PER_ROW 8
+#define ROWS_PER_UINT 4
+#define ROW_MASK 0xFF
+#endif
+
 // Optional features
-//#undef ENABLE_DEBUG
-#define ENABLE_DEBUG
+#undef ENABLE_DEBUG
+
 /*
 ** Return the offset of Xi in bytes from the beginning of the slot.
 */

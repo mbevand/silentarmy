@@ -138,7 +138,7 @@ static void Sha256_Transform(uint32_t *state, const uint32_t *data)
   for (j = 0; j < 8; j++)
     state[j] += T[j];
   #endif
-  
+
   /* Wipe variables */
   /* memset(W, 0, sizeof(W)); */
   /* memset(T, 0, sizeof(T)); */
