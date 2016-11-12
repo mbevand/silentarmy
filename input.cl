@@ -124,11 +124,15 @@ uint ht_store(uint round, __global char *ht, uint i,
     p = ht + row * NR_SLOTS * SLOT_LEN;
     uint rowIdx = row/ROWS_PER_UINT;
     uint rowOffset = BITS_PER_ROW*(row%ROWS_PER_UINT);
-    uint xcnt = atomic_add(rowCounters+rowIdx, 1u<<rowOffset);
+    uint xcnt = atomic_add(rowCounters + rowIdx, 1 << rowOffset);
     xcnt = (xcnt >> rowOffset) & ROW_MASK;
     cnt = xcnt;
     if (cnt >= NR_SLOTS)
+      {
+	// avoid overflows
+	atomic_sub(rowCounters + rowIdx, 1 << rowOffset);
 	return 1;
+      }
     p += cnt * SLOT_LEN + xi_offset_for_round(round);
     // store "i" (always 4 bytes before Xi)
     *(__global uint *)(p - 4) = i;
@@ -578,7 +582,7 @@ void equihash_round(uint round,
     for (i = 0; i < cnt; i++, p += SLOT_LEN)
 	first_words[i] = (*(__global uchar *)p) & mask;
     // find collisions
-    for (i = 0; i < cnt-1 && thCollNum < NR_SLOTS*3; i++)
+    for (i = 0; i < cnt-1 && thCollNum < COLL_DATA_SIZE_PER_TH; i++)
       {
 	uchar data_i = first_words[i];
 	uint collision = (tid << 10) | (i << 5) | (i + 1);
@@ -674,7 +678,7 @@ void kernel_round ## N(__global char *ht_src, __global char *ht_dst, \
        	__global uint *debug) \
 { \
     __local uchar first_words_data[(NR_SLOTS+2)*64]; \
-    __local uint    collisionsData[NR_SLOTS*3*64]; \
+    __local uint    collisionsData[COLL_DATA_SIZE_PER_TH * 64]; \
     __local uint    collisionsNum; \
     equihash_round(N, ht_src, ht_dst, debug, first_words_data, collisionsData, \
 	    &collisionsNum, rowCountersSrc, rowCountersDst); \
@@ -695,7 +699,7 @@ void kernel_round8(__global char *ht_src, __global char *ht_dst,
 {
     uint		tid = get_global_id(0);
     __local uchar	first_words_data[(NR_SLOTS+2)*64];
-    __local uint	collisionsData[NR_SLOTS*3*64];
+    __local uint	collisionsData[COLL_DATA_SIZE_PER_TH * 64];
     __local uint	collisionsNum;
     equihash_round(8, ht_src, ht_dst, debug, first_words_data, collisionsData,
 	    &collisionsNum, rowCountersSrc, rowCountersDst);
