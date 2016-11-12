@@ -823,7 +823,7 @@ uint32_t verify_sols(cl_command_queue queue, cl_mem buf_sols, uint64_t *nonce,
     cl_int readStatus;
     clGetEventInfo(readEvent, CL_EVENT_COMMAND_EXECUTION_STATUS, sizeof(cl_int),
         &readStatus, NULL);
-    while(readStatus != CL_COMPLETE)
+    while(readStatus != CL_COMPLETE && SLEEP_SKIP_RATIO != 1)
     {
         struct timespec t;
         get_time(&t);
@@ -849,7 +849,7 @@ uint32_t verify_sols(cl_command_queue queue, cl_mem buf_sols, uint64_t *nonce,
 
     delta = dend - dstart;
     kern_avg_run_time = kern_avg_run_time * 6.0 / 10.0 + delta * ((4.0 / 10.0));
-    kern_avg_run_time *= (1 - SLEEP_SKIP_RATIO);
+    kern_avg_run_time *= (1 - (double)SLEEP_SKIP_RATIO);
 
     if (sols->nr > MAX_SOLS)
       {
