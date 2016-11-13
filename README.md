@@ -161,7 +161,7 @@ their nonces varying from 0 to 99):
 
 `$ make test`
 
-For more testing run `sa-solver --nonces 10000`. It should finds 18681
+For more testing run `sa-solver --nonces 10000`. It should finds 18627
 solutions which is less than 1% off the theoretical expected average number of
 solutions of 1.88 per Equihash run at (n,k)=(200,9).
 
@@ -196,13 +196,13 @@ and statistics in progressively more and more details.
 
 # Implementation details
 
-The `silentarmy` Python script is actually mostly a lighteight Stratum
-implementation and job dispatcher that sends Equihash work items to 1 or more
-instances of `sa-solver --mining` which initializes the solver in a special
-"mining mode" so it can be controled via stdin/stdout. By default 2 instances
-of `sa-solver` are launched for each GPU (this can be changed with the
-`silentarmy --instances N` option.) 2 instances per GPU usually results in the
-best performance.
+The `silentarmy` Python script is actually mostly a lightweight Stratum
+implementation which launches in the background one or more instances of
+`sa-solver --mining` per GPU. This "mining mode" enables `sa-solver` to
+communicate with `silentarmy` using stdin/stdout. By default 2 instances of
+`sa-solver` are launched for each GPU (this can be changed with the `silentarmy
+--instances N` option.) 2 instances per GPU usually results in the best
+performance.
 
 The `sa-solver` binary invokes the OpenCL kernel which contains the core of the
 Equihash algorithm. My implementation uses two hash tables to avoid having to
