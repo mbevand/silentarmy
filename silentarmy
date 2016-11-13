@@ -264,6 +264,7 @@ class Silentarmy:
             shares = sum(self.total_shares.values())
             print("Total %s sol/s [%s] %d share%s" % \
                     (rate_avg, info_gpus, shares, '' if shares == 1 else 's'))
+            sys.stdout.flush()
 
     def list_devices(self):
         try:
