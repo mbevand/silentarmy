@@ -54,6 +54,119 @@ Options:
   -p PWD, --pwd=PWD     password for connecting to the pool
 ```
 
+# Performance
+
+* 115 sol/s with one R9 Nano
+* 75 sol/s with one RX 480 8GB
+* 70 sol/s with one GTX 1070
+
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md#performance) to resolve performance
+issues.
+
+Note: the `silentarmy` **miner** automatically achieves this performance level,
+however the `sa-solver` **command-line solver** by design runs only 1 instance
+of the Equihash proof-of-work algorithm causing it to slightly underperform by
+5-10%. One must manually run 2 instances of `sa-solver` (eg. in 2 terminal
+consoles) to achieve the same performance level as the `silentarmy` **miner**.
+
+# Compilation and installation
+
+The steps below describe how to obtain the dependencies needed by SILENTARMY,
+how to compile it, and how to install it.
+
+## Step 1: OpenCL
+
+OpenCL support comes with the graphic card driver. Read the appropriate
+subsection below:
+
+### Ubuntu 16.04 / amdgpu
+
+1. Download the [AMDGPU-PRO Driver](http://support.amd.com/en-us/kb-articles/Pages/AMDGPU-PRO-Install.aspx)
+(as of 30 Oct 2016, the latest version is 16.40).
+
+2. Extract it:
+   `$ tar xf amdgpu-pro-16.40-348864.tar.xz`
+
+3. Install (non-root, will use sudo access automatically):
+   `$ ./amdgpu-pro-install`
+
+4. Add yourself to the video group if not already a member:
+   `$ sudo gpasswd -a $(whoami) video`
+
+5. Reboot
+
+6. Download the [AMD APP SDK](http://developer.amd.com/tools-and-sdks/opencl-zone/amd-accelerated-parallel-processing-app-sdk/)
+(as of 27 Oct 2016, the latest version is 3.0)
+
+7. Extract it:
+   `$ tar xf AMD-APP-SDKInstaller-v3.0.130.136-GA-linux64.tar.bz2`
+
+8. Install system-wide by running as root (accept all the default options):
+   `$ sudo ./AMD-APP-SDK-v3.0.130.136-GA-linux64.sh`
+
+### Ubuntu 14.04 / fglrx
+
+1. Install the official Ubuntu package for the **Radeon Software Crimson
+   Edition** driver:
+   `$ sudo apt-get install fglrx`
+   (as of 30 Oct 2016, the latest version is 2:15.201-0ubuntu0.14.04.1)
+
+2. Follow steps 5-8 above: reboot, install the AMD APP SDK...
+
+### Ubuntu 16.04 / Nvidia
+
+1. Install the OpenCL development files and the latest driver:
+   `$ sudo apt-get install nvidia-opencl-dev nvidia-361`
+
+2. Either reboot, or load the kernel driver:
+   `$ sudo modprobe nvidia_361`
+
+## Step 2: Python 3.3
+
+1. SILENTARMY requires Python 3.3 or later (needed to support the use of the
+   `yield from` syntax). On Ubuntu/Debian systems:
+   `$ sudo apt-get install python3`
+
+2. Verify the Python version is 3.3 or later:
+   `$ python3 -V`
+
+## Step 3: C compiler
+
+1. A C compiler is needed to compile the SILENTARMY solver binary (`sa-solver`):
+   `$ sudo apt-get install build-essential`
+
+## Step 4: Get SILENTARMY
+
+Download it as a ZIP from github: https://github.com/mbevand/silentarmy/archive/master.zip
+
+Or clone it from the command line:
+`$ git clone https://github.com/mbevand/silentarmy.git`
+
+Or, for Arch Linux users, get the
+[silentarmy AUR package](https://aur.archlinux.org/packages/silentarmy/).
+
+## Step 5: Compile and install
+
+Compiling SILENTARMY is easy:
+
+`$ make`
+
+You may need to specify the paths to the locations of your OpenCL C headers
+and libOpenCL.so if the compiler does not find them, eg.:
+
+`$ make OPENCL_HEADERS=/usr/local/cuda-8.0/targets/x86_64-linux/include LIBOPENCL=/usr/local/cuda-8.0/targets/x86_64-linux/lib`
+
+Self-testing the command-line solver (solves 100 all-zero 140-byte blocks with
+their nonces varying from 0 to 99):
+
+`$ make test`
+
+For more testing run `sa-solver --nonces 10000`. It should finds 18627
+solutions which is less than 1% off the theoretical expected average number of
+solutions of 1.88 per Equihash run at (n,k)=(200,9).
+
+For installing, just copy `silentarmy` and `sa-solver` to the same directory.
+
 # Equihash solver
 
 SILENTARMY also provides a command line Equihash solver (`sa-solver`)
@@ -76,123 +189,20 @@ quick test/benchmark is simply:
 `$ sa-solver --nonces 100`
 
 Note: due to BLAKE2b optimizations in my implementation, if the header is
-specified it must be 140 bytes and its last 12 bytes **must** be zero. For
-convenience, `-i` can also specify a 108-byte nonceless header to which
-`sa-solver` adds an implicit nonce of 32 zero bytes.
+specified it must be 140 bytes and its last 12 bytes **must** be zero.
 
 Use the verbose (`-v`) and very verbose (`-v -v`) options to show the solutions
 and statistics in progressively more and more details.
 
-# Performance
-
-* 47.5 Sol/s with one R9 Nano
-* 45.0 Sol/s with one R9 290X
-* 41.0 Sol/s with one RX 480 8GB
-
-Note: the `silentarmy` **miner** automatically achieves this performance level,
-however the `sa-solver` **command-line solver** by design runs only 1 instance
-of the Equihash proof-of-work algorithm causing it to underperform. One must
-manually run 2 instances of `sa-solver` (eg. in 2 terminal consoles) to
-achieve the same performance level as the `silentarmy` **miner**.
-
-For a potential performance speedup, set `OPTIM_SIMPLIFY_ROUND` to 1,
-see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
-
-# Dependencies
-
-SILENTARMY has only one build dependency: an OpenCL implementation. And it
-has only one runtime dependency: Python 3.3 or later (needed to support the
-use of the `yield from` syntax.)
-
-When running on AMD GPUs, install the **AMD APP SDK** (OpenCL implementation)
-and either:
-* the **AMDGPU-PRO** driver (amdgpu.ko, for newer GPUs), or
-* the **Radeon Software Crimson Edition** driver (fglrx.ko, for older GPUs)
-
-When running on Nvidia GPUs, install the Nvidia OpenCL development files,
-and their binary driver.
-
-Instructions are provided below for a few Linux versions.
-
-## Ubuntu 16.04 / amdgpu
-
-1. Download the [AMDGPU-PRO Driver](http://support.amd.com/en-us/kb-articles/Pages/AMDGPU-PRO-Install.aspx)
-(as of 30 Oct 2016, the latest version is 16.40)
-
-2. Extract it:
-   `$ tar xf amdgpu-pro-16.40-348864.tar.xz`
-
-3. Install (non-root, will use sudo access automatically):
-   `$ ./amdgpu-pro-install`
-
-4. Add yourself to the video group if not already a member:
-   `$ sudo gpasswd -a $(whoami) video`
-
-5. Reboot
-
-6. Download the [AMD APP SDK](http://developer.amd.com/tools-and-sdks/opencl-zone/amd-accelerated-parallel-processing-app-sdk/)
-(as of 27 Oct 2016, the latest version is 3.0)
-
-7. Extract it:
-   `$ tar xf AMD-APP-SDKInstaller-v3.0.130.136-GA-linux64.tar.bz2`
-
-8. Install system-wide by running as root (accept all the default options):
-  `$ sudo ./AMD-APP-SDK-v3.0.130.136-GA-linux64.sh`
-
-9. Install compiler dependencies in order to compile SILENTARMY:
-  `$ sudo apt-get install build-essential`
-
-## Ubuntu 14.04 / fglrx
-
-1. Install the official Ubuntu package:
-   `$ sudo apt-get install fglrx`
-   (as of 30 Oct 2016, the latest version is 2:15.201-0ubuntu0.14.04.1)
-
-2. Follow steps 5-9 above.
-
-## Ubuntu 16.04 / Nvidia
-
-1. Install the OpenCL development files and the latest driver:
-   `$ sudo apt-get install nvidia-opencl-dev nvidia-361`
-
-2. Install compiler dependencies in order to compile SILENTARMY:
-  `$ sudo apt-get install build-essential`
-
-## Arch Linux
-
-1. Install the [silentarmy AUR package](https://aur.archlinux.org/packages/silentarmy/).
-
-# Compilation and installation
-
-Compiling SILENTARMY is easy:
-
-`$ make`
-
-You may need to specify the paths to the locations of your OpenCL C headers
-and libOpenCL.so if the compiler does not find them:
-
-`$ make OPENCL_HEADERS=/path/here LIBOPENCL=/path/there`
-
-Self-testing the command-line solver (solves 100 all-zero 140-byte blocks with
-their nonces varying from 0 to 99):
-
-`$ make test`
-
-For more testing run `sa-solver --nonces 10000`. It should finds 18681
-solutions which is less than 1% off the theoretical expected average number of
-solutions of 1.88 per Equihash run at (n,k)=(200,9).
-
-For installing, just copy `silentarmy` and `sa-solver` to the same directory.
-
 # Implementation details
 
-The `silentarmy` Python script is actually mostly a lighteight Stratum
-implementation and job dispatcher that sends Equihash work items to 1 or more
-instances of `sa-solver --mining` which initializes the solver in a special
-"mining mode" so it can be controled via stdin/stdout. By default 2 instances
-of `sa-solver` are launched for each GPU (this can be changed with the
-`silentarmy --instances N` option.) 2 instances per GPU usually results in the
-best performance.
+The `silentarmy` Python script is actually mostly a lightweight Stratum
+implementation which launches in the background one or more instances of
+`sa-solver --mining` per GPU. This "mining mode" enables `sa-solver` to
+communicate with `silentarmy` using stdin/stdout. By default 2 instances of
+`sa-solver` are launched for each GPU (this can be changed with the `silentarmy
+--instances N` option.) 2 instances per GPU usually results in the best
+performance.
 
 The `sa-solver` binary invokes the OpenCL kernel which contains the core of the
 Equihash algorithm. My implementation uses two hash tables to avoid having to
@@ -236,6 +246,8 @@ almost certainly bits 180-199), this is also discarded as a likely invalid
 solution because this is statistically guaranteed to be all inputs repeated
 at least once. This check is implemented in `kernel_sols()` (see
 `likely_invalids`.)
+* When input references are expanded on-GPU by `expand_refs()`, the code
+checks if the last (512th) input is repeated at least once.
 * Finally when the GPU returns potential solutions, the CPU also checks for
 invalid solutions with duplicate inputs. This check is implemented in
 `verify_sol()`.
@@ -253,8 +265,12 @@ Donations welcome: t1cVviFvgJinQ4w3C2m2CfRxgP5DnHYaoFC
 
 I would like to thank these persons for their contributions to SILENTARMY,
 in alphabetical order:
+* eXtremal
+* kenshirothefist
 * lhl
 * nerdralph
+* poiuty
+* solardiz
 
 # License
 
