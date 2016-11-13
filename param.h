@@ -13,6 +13,13 @@
 // Number of collision items to track, per thread
 #define COLL_DATA_SIZE_PER_TH		(NR_SLOTS * 5)
 
+
+// Ratio of time of sleeping before rechecking if task is done (0-1)
+#define SLEEP_RECHECK_RATIO 0.60
+// Ratio of time to busy wait for the solution (0-1)
+// The higher value the higher CPU usage with Nvidia
+#define SLEEP_SKIP_RATIO 0.005
+
 // Make hash tables OVERHEAD times larger than necessary to store the average
 // number of elements per row. The ideal value is as small as possible to
 // reduce memory usage, but not too small or else elements are dropped from the
