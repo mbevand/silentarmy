@@ -17,3 +17,7 @@ windows/silentarmy.VC.db
 windows/silentarmy.VC.VC.opendb
 sa-solver.iobj
 sa-solver.ipdb
+windows/dist
+windows/build
+windows/Program.spec
+windows/silentarmy.spec
