@@ -21,3 +21,4 @@ windows/dist
 windows/build
 windows/Program.spec
 windows/silentarmy.spec
+sa-solver.exe
