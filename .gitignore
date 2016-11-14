@@ -13,3 +13,7 @@ _temp_*
 *.tmp
 *.pyc
 tags
+windows/silentarmy.VC.db
+windows/silentarmy.VC.VC.opendb
+sa-solver.iobj
+sa-solver.ipdb

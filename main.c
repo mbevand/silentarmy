@@ -231,7 +231,7 @@ void load_file(const char *fname, char **dat, size_t *dat_len)
     struct stat	st;
     int		fd;
     ssize_t	ret;
-    if (-1 == (fd = open(fname, O_RDONLY)))
+    if (-1 == (fd = open(fname, O_RDONLY | O_BINARY)))
 	fatal("%s: %s\n", fname, strerror(errno));
     if (fstat(fd, &st))
 	fatal("fstat: %s: %s\n", fname, strerror(errno));
@@ -241,7 +241,7 @@ void load_file(const char *fname, char **dat, size_t *dat_len)
     ret = read(fd, *dat, *dat_len);
     if (ret < 0)
 	fatal("read: %s: %s\n", fname, strerror(errno));
-    if ((size_t)ret != *dat_len)
+	if ((size_t)ret != *dat_len)
 	fatal("%s: partial read\n", fname);
     if (close(fd))
 	fatal("close: %s: %s\n", fname, strerror(errno));
