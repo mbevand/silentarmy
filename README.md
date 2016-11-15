@@ -1,6 +1,7 @@
 # SILENTARMY Standalone Version for Windows x86_64
 
 [Download precompiled binaries (v5-win64standalone-r2)](https://github.com/zawawawa/silentarmy/releases/download/v5-win64standalone-r2/silentarmy-v5-win64standalone-r2.zip)
+
 [Download precompiled binaries (v5-win64standalone-r1)](https://github.com/zawawawa/silentarmy/releases/download/v5-win64standalone-r1/silentarmy-v5-win64standalone-r1.zip)
 
 This is a standalone Windows x86_64 port of SILENTARMY v5, which does not require Python, based on [Genoil's Windows port](https://github.com/Genoil/silentarmy/tree/windows).
