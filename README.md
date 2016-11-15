@@ -4,7 +4,7 @@ This is a standalone Windows x86_64 port of SILENTARMY v5, which does not requir
 
 https://github.com/Genoil/silentarmy/tree/windows 
 
-All you have to do for mining is to run "list.bat" to get device ID's and edit and run "start.bat". MAKE SURE TO SPECIFY CORRECT DEVICE IDS WITH THE "--use" OPTION! See the documentation of the original SILENTARMY below for details.
+All you have to do for mining is to run "list.bat" to get device ID's and edit and run "silentarmy.bat". MAKE SURE TO SPECIFY CORRECT DEVICE IDS WITH THE "--use" OPTION! See the documentation of the original SILENTARMY below for details.
 
 If you find this port useful and/or would like to see a feature-rich ZEC miner based on it, please consider donations to: t1NwUDeSKu4BxkD58mtEYKDjzw5toiLfmCu
 
