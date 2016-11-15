@@ -22,3 +22,4 @@ windows/build
 windows/Program.spec
 windows/silentarmy.spec
 sa-solver.exe
+windows/.vs/silentarmy/v14/.suo
