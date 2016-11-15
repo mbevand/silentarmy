@@ -175,6 +175,7 @@ copy  $(SolutionDir)\..\silentarmy.bat $(SolutionDir)\dist\silentarmy</Command>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\input.cl" />
+    <None Include="..\silentarmy.py" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

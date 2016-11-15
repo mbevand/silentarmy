@@ -49,5 +49,8 @@
     <None Include="..\input.cl">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="..\silentarmy.py">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
 </Project>
