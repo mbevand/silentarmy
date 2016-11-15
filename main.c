@@ -1367,7 +1367,7 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
     if (!mining || verbose)
 	fprintf(stderr, "Building program\n");
     status = clBuildProgram(program, 1, &dev_id,
-	    (amd_flag) ? ("-I .. -I . -O5") : ("-I .. -I ."), // compile options
+	    (amd_flag) ? ("-I .. -I .") : ("-I .. -I ."), // compile options
 	    NULL, NULL);
     if (status != CL_SUCCESS)
       {
