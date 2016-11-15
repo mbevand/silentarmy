@@ -11,7 +11,11 @@
 #define OPTIM_SIMPLIFY_ROUND		1
 
 // Number of collision items to track, per thread
+#ifdef cl_nv_pragma_unroll // NVIDIA
+#define COLL_DATA_SIZE_PER_TH		(NR_SLOTS * 9)
+#else
 #define COLL_DATA_SIZE_PER_TH		(NR_SLOTS * 5)
+#endif
 
 // Make hash tables OVERHEAD times larger than necessary to store the average
 // number of elements per row. The ideal value is as small as possible to

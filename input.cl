@@ -78,6 +78,137 @@ void kernel_init_ht(__global char *ht, __global uint *rowCounters)
 **
 ** Return 0 if successfully stored, or 1 if the row overflowed.
 */
+#ifdef cl_nv_pragma_unroll // NVIDIA
+uint ht_store(uint round, __global char *ht, uint i,
+	ulong xi0, ulong xi1, ulong xi2, ulong xi3, __global uint *rowCounters)
+{
+    uint    row;
+    __global char       *p;
+    uint                cnt;
+   uint                tid = get_global_id(0);
+uint                tlid = get_local_id(0);
+#if NR_ROWS_LOG == 16
+    if (!(round % 2))
+	row = (xi0 & 0xffff);
+    else
+	// if we have in hex: "ab cd ef..." (little endian xi0) then this
+	// formula computes the row as 0xdebc. it skips the 'a' nibble as it
+	// is part of the PREFIX. The Xi will be stored starting with "ef...";
+	// 'e' will be considered padding and 'f' is part of the current PREFIX
+	row = ((xi0 & 0xf00) << 4) | ((xi0 & 0xf00000) >> 12) |
+	    ((xi0 & 0xf) << 4) | ((xi0 & 0xf000) >> 12);
+#elif NR_ROWS_LOG == 18
+    if (!(round % 2))
+	row = (xi0 & 0xffff) | ((xi0 & 0xc00000) >> 6);
+    else
+	row = ((xi0 & 0xc0000) >> 2) |
+	    ((xi0 & 0xf00) << 4) | ((xi0 & 0xf00000) >> 12) |
+	    ((xi0 & 0xf) << 4) | ((xi0 & 0xf000) >> 12);
+#elif NR_ROWS_LOG == 19
+    if (!(round % 2))
+	row = (xi0 & 0xffff) | ((xi0 & 0xe00000) >> 5);
+    else
+	row = ((xi0 & 0xe0000) >> 1) |
+	    ((xi0 & 0xf00) << 4) | ((xi0 & 0xf00000) >> 12) |
+	    ((xi0 & 0xf) << 4) | ((xi0 & 0xf000) >> 12);
+#elif NR_ROWS_LOG == 20
+    if (!(round % 2))
+	row = (xi0 & 0xffff) | ((xi0 & 0xf00000) >> 4);
+    else
+	row = ((xi0 & 0xf0000) >> 0) |
+	    ((xi0 & 0xf00) << 4) | ((xi0 & 0xf00000) >> 12) |
+	    ((xi0 & 0xf) << 4) | ((xi0 & 0xf000) >> 12);
+#else
+#error "unsupported NR_ROWS_LOG"
+#endif
+    xi0 = (xi0 >> 16) | (xi1 << (64 - 16));
+    xi1 = (xi1 >> 16) | (xi2 << (64 - 16));
+    xi2 = (xi2 >> 16) | (xi3 << (64 - 16));
+    p = ht + row * NR_SLOTS * SLOT_LEN;
+    uint rowIdx = row/ROWS_PER_UINT;
+    uint rowOffset = BITS_PER_ROW*(row%ROWS_PER_UINT);
+    uint xcnt = atomic_add(rowCounters + rowIdx, 1 << rowOffset);
+    xcnt = (xcnt >> rowOffset) & ROW_MASK;
+    cnt = xcnt;
+    if (cnt >= NR_SLOTS)
+      {
+	// avoid overflows
+	atomic_sub(rowCounters + rowIdx, 1 << rowOffset);
+	return 1;
+      }
+    p += cnt * SLOT_LEN + xi_offset_for_round(round);
+    // store "i" (always 4 bytes before Xi)
+//    *(__global uint *)(p - 4) = i;
+    if (round == 0 || round == 1)
+      {
+	//*(__global uint *)(p - 4) = i;
+	// store 24 bytes
+	ulong2 store;
+	store.x=xi1;
+	store.y=xi2;
+	//*(__global ulong *)(p + 0) = xi0;
+	*(__global uint *)(p - 4) = i;
+	*(__global ulong *)(p + 0) = xi0;
+	*(__global ulong2 *)(p + 8)=store;	
+
+      }
+    else if (round == 2)
+      {
+//	*(__global uint *)(p - 4) = i;
+	// store 20 bytes
+
+	*(__global ulong *)(p - 4) = ((ulong)i) | (xi0 << 32);
+	*(__global ulong *)(p + 4) = (xi0 >> 32) | (xi1 << 32);
+	*(__global ulong *)(p + 12) = (xi1 >> 32) | (xi2 << 32);
+
+      }
+    else if (round == 3)
+      {
+//	*(__global uint *)(p - 4) = i;
+	// store 16 bytes
+	//8 byte align	
+	*(__global ulong *)(p - 4) = ((ulong)i) | (xi0 << 32);
+	*(__global ulong *)(p + 4) = (xi0 >> 32) | (xi1 << 32);
+	*(__global uint *)(p + 12) = (xi1 >> 32);
+      }
+    else if (round == 4)
+      {
+//	*(__global uint *)(p - 4) = i;
+	// store 16 bytes
+	*(__global uint *)(p - 4) = i;
+	*(__global ulong *)(p + 0) = xi0;
+	*(__global ulong *)(p + 8) = xi1;
+      }
+    else if (round == 5)
+      {
+	//*(__global uint *)(p - 4) = i;
+	// store 12 bytes
+//	*(__global uint *)(p - 4) = i;
+
+	*(__global uint *)(p - 4) = i;
+	*(__global ulong *)(p + 0) = xi0;	
+	*(__global uint *)(p + 8) = xi1;
+      }
+    else if (round == 6 || round == 7)
+      {
+//	*(__global uint *)(p - 4) = i;
+	// store 8 bytes
+	*(__global ulong *)(p - 4) = ((ulong)i) | (xi0 << 32);
+	*(__global uint *)(p + 4) = (xi0 >> 32);	
+      }
+    else if (round == 8)
+      {
+	//4 byte align
+	*(__global uint *)(p - 4) = i;
+	// store 4 bytes
+	*(__global uint *)(p + 0) = xi0;
+
+      }
+
+//*(__global uint *)(p - 4) = i;
+    return 0;
+}
+#else
 uint ht_store(uint round, __global char *ht, uint i,
 	ulong xi0, ulong xi1, ulong xi2, ulong xi3, __global uint *rowCounters)
 {
@@ -182,6 +313,7 @@ uint ht_store(uint round, __global char *ht, uint i,
       }
     return 0;
 }
+#endif
 
 #define mix(va, vb, vc, vd, x, y) \
     va = (va + vb + x); \
@@ -469,6 +601,29 @@ uint xor_and_store(uint round, __global char *ht_dst, uint row,
 	    xi2 = (xi2 >> 8);
 	  }
       }
+#ifdef cl_nv_pragma_unroll // NVIDIA
+   else if (round == 3)
+      {
+	// xor 20 bytes
+	uint one = *(__global uint *)a ^ *(__global uint *)b;
+	
+	
+
+	uint4 loada = *(__global uint4 *)((__global char *)a + 4);
+	uint4 loadb = *(__global uint4 *)((__global char *)b + 4);
+	uint4 stor = loada ^ loadb;
+	
+	
+	xi0 = ((ulong)one ) | ((ulong) stor.x << 32);
+	xi1 = ((ulong)stor.y << 32) | ((ulong)stor.z );
+	xi2 = stor.w;	
+
+
+	//xi0 = half_aligned_long(a, 0) ^ half_aligned_long(b, 0);
+	//xi1 = half_aligned_long(a, 8) ^ half_aligned_long(b, 8);
+	//xi2 = well_aligned_int(a, 16) ^ well_aligned_int(b, 16);
+      }
+#else
     else if (round == 3)
       {
 	// xor 20 bytes
@@ -476,6 +631,7 @@ uint xor_and_store(uint round, __global char *ht_dst, uint row,
 	xi1 = half_aligned_long(a, 8) ^ half_aligned_long(b, 8);
 	xi2 = well_aligned_int(a, 16) ^ well_aligned_int(b, 16);
       }
+#endif
     else if (round == 4 || round == 5)
       {
 	// xor 16 bytes
@@ -543,7 +699,7 @@ void equihash_round(uint round,
     uint		tlid = get_local_id(0);
     __global char	*p;
     uint		cnt;
-    __local uchar	*first_words = &first_words_data[(NR_SLOTS+2)*tlid];
+    __local uchar	*first_words = &first_words_data[(NR_SLOTS+0)*tlid];
     uchar		mask;
     uint		i, j;
     // NR_SLOTS is already oversized (by a factor of OVERHEAD), but we want to
