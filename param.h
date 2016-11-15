@@ -12,7 +12,7 @@
 
 // Number of collision items to track, per thread
 #ifdef cl_nv_pragma_unroll // NVIDIA
-#define COLL_DATA_SIZE_PER_TH		(NR_SLOTS * 9)
+#define COLL_DATA_SIZE_PER_TH		(NR_SLOTS * 6)
 #else
 #define COLL_DATA_SIZE_PER_TH		(NR_SLOTS * 5)
 #endif
