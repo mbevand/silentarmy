@@ -157,7 +157,9 @@
 copy  $(SolutionDir)\..\sa-solver.exe $(SolutionDir)\dist\silentarmy
 copy  $(SolutionDir)\..\input.cl $(SolutionDir)\dist\silentarmy
 copy  $(SolutionDir)\..\param.h $(SolutionDir)\dist\silentarmy
-copy  $(SolutionDir)\..\silentarmy.bat $(SolutionDir)\dist\silentarmy</Command>
+copy  $(SolutionDir)\..\silentarmy.bat $(SolutionDir)\dist\silentarmy
+copy  $(SolutionDir)\..\list.bat $(SolutionDir)\dist\silentarmy
+copy  $(SolutionDir)\..\README.md $(SolutionDir)\dist\silentarmy</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
