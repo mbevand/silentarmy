@@ -7,16 +7,43 @@
 #include <inttypes.h>
 #include <assert.h>
 #include <sys/types.h>
-#include <sys/time.h>
-#include <sys/stat.h>
 #include <fcntl.h>
-#include <unistd.h>
-#include <getopt.h>
+#include <sys/stat.h>
+
+
 #include <errno.h>
+#include <time.h>
 #include <CL/cl.h>
 #include "blake.h"
-#include "_kernel.h"
 #include "sha256.h"
+
+#ifdef WIN32
+
+#undef _UNICODE // @mrb quick patch to make win getopt work
+
+#include <Winsock2.h>
+#include <io.h>
+#include <BaseTsd.h>
+#include "windows/gettimeofday.h"
+#include "windows/getopt.h"
+#include "windows/memrchr.h"
+
+typedef SSIZE_T ssize_t;
+
+#define open _open
+#define read _read
+#define write _write
+#define close _close
+#define snprintf _snprintf
+
+#else
+
+#include <sys/time.h>
+#include <unistd.h>
+#include <getopt.h>
+#include "_kernel.h"
+
+#endif
 
 typedef uint8_t		uchar;
 typedef uint32_t	uint;
@@ -31,6 +58,13 @@ uint64_t	nr_nonces = 1;
 uint32_t	do_list_devices = 0;
 uint32_t	gpu_to_use = 0;
 uint32_t	mining = 0;
+#ifdef WIN32
+LARGE_INTEGER pc_freq;
+LONGLONG kern_avg_run_time = 0;
+#else
+struct timespec kern_avg_run_time;
+#endif
+
 
 typedef struct  debug_s
 {
@@ -89,17 +123,21 @@ void show_time(uint64_t t0)
     fprintf(stderr, "Elapsed time: %.1f msec\n", (t1 - t0) / 1e3);
 }
 
+#ifndef WIN32
 void set_blocking_mode(int fd, int block)
 {
-    int		f;
+
+	int	f;
     if (-1 == (f = fcntl(fd, F_GETFL)))
 	fatal("fcntl F_GETFL: %s\n", strerror(errno));
     if (-1 == fcntl(fd, F_SETFL, block ? (f & ~O_NONBLOCK) : (f | O_NONBLOCK)))
-	fatal("fcntl F_SETFL: %s\n", strerror(errno));
+		fatal("fcntl F_SETFL: %s\n", strerror(errno));
 }
+#endif
 
 void randomize(void *p, ssize_t l)
 {
+#ifndef WIN32
     const char	*fname = "/dev/urandom";
     int		fd;
     ssize_t	ret;
@@ -111,8 +149,26 @@ void randomize(void *p, ssize_t l)
 	fatal("%s: short read %d bytes out of %d\n", fname, ret, l);
     if (-1 == close(fd))
 	fatal("close %s: %s\n", fname, strerror(errno));
+#else
+	for (int i = 0; i < l; i++)
+		((uint8_t *)p)[i] = rand() & 0xff;
+#endif
 }
 
+#ifndef WIN32
+struct timespec time_diff(struct timespec start, struct timespec end)
+{
+	struct timespec temp;
+	if ((end.tv_nsec-start.tv_nsec)<0) {
+		temp.tv_sec = end.tv_sec-start.tv_sec-1;
+		temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
+	} else {
+		temp.tv_sec = end.tv_sec-start.tv_sec;
+		temp.tv_nsec = end.tv_nsec-start.tv_nsec;
+	}
+	return temp;
+}
+#endif
 cl_mem check_clCreateBuffer(cl_context ctx, cl_mem_flags flags, size_t size,
 	void *host_ptr)
 {
@@ -181,15 +237,24 @@ uint8_t hex2val(const char *base, size_t off)
     if (c >= '0' && c <= '9')           return c - '0';
     else if (c >= 'a' && c <= 'f')      return 10 + c - 'a';
     else if (c >= 'A' && c <= 'F')      return 10 + c - 'A';
-    fatal("Invalid hex char at offset %zd: ...%c...\n", off, c);
+    fatal("Invalid hex char at offset %d: ...%d...\n", off, c);
     return 0;
 }
 
-unsigned nr_compute_units(const char *gpu)
+unsigned nr_compute_units(cl_device_id dev_id)
 {
-    if (!strcmp(gpu, "rx480")) return 36;
-    fprintf(stderr, "Unknown GPU: %s\n", gpu);
-    return 0;
+	unsigned nr_cus = 0;
+	int		 status;
+
+	status = clGetDeviceInfo(dev_id,
+		CL_DEVICE_MAX_COMPUTE_UNITS,
+		sizeof(unsigned),
+		&nr_cus, NULL);
+	
+	if (status != CL_SUCCESS)
+		fatal("clGetDeviceInfo (%d)\n", status);
+
+	return nr_cus;
 }
 
 void load_file(const char *fname, char **dat, size_t *dat_len)
@@ -470,13 +535,13 @@ void examine_dbg(cl_command_queue queue, cl_mem buf_dbg, size_t dbg_size)
     free(dbg);
 }
 
-size_t select_work_size_blake(void)
+size_t select_work_size_blake(cl_device_id dev_id)
 {
     size_t              work_size =
         64 * /* thread per wavefront */
         BLAKE_WPS * /* wavefront per simd */
         4 * /* simd per compute unit */
-        nr_compute_units("rx480");
+		nr_compute_units(dev_id);
     // Make the work group size a multiple of the nr of wavefronts, while
     // dividing the number of inputs. This results in the worksize being a
     // power of 2.
@@ -735,18 +800,22 @@ void sort_pair(uint32_t *a, uint32_t len)
 ** If solution is invalid return 0. If solution is valid, sort the inputs
 ** and return 1.
 */
+
+#define SEEN_LEN (1 << (PREFIX + 1)) / 8
+
 uint32_t verify_sol(sols_t *sols, unsigned sol_i)
 {
     uint32_t	*inputs = sols->values[sol_i];
-    uint32_t	seen_len = (1 << (PREFIX + 1)) / 8;
-    uint8_t	seen[seen_len];
+    //uint32_t	seen_len = (1 << (PREFIX + 1)) / 8; 
+	//uint8_t	seen[seen_len]; // @mrb MSVC didn't like this.
+	uint8_t	seen[SEEN_LEN]; 
     uint32_t	i;
     uint8_t	tmp;
     // look for duplicate inputs
-    memset(seen, 0, seen_len);
+	memset(seen, 0, SEEN_LEN);
     for (i = 0; i < (1 << PARAM_K); i++)
       {
-	if (inputs[i] / 8 >= seen_len)
+		  if (inputs[i] / 8 >= SEEN_LEN)
 	  {
 	    warn("Invalid input retrieved from device: %d\n", inputs[i]);
 	    sols->valid[sol_i] = 0;
@@ -776,13 +845,24 @@ uint32_t verify_sol(sols_t *sols, unsigned sol_i)
 */
 uint32_t verify_sols(cl_command_queue queue, cl_mem buf_sols, uint64_t *nonce,
 	uint8_t *header, size_t fixed_nonce_bytes, uint8_t *target,
-       	char *job_id, uint32_t *shares)
+	char *job_id, uint32_t *shares,
+#ifdef WIN32
+    LARGE_INTEGER *start_time
+#else
+    struct timespec *start_time
+#endif
+)
 {
     sols_t	*sols;
     uint32_t	nr_valid_sols;
     sols = (sols_t *)malloc(sizeof (*sols));
     if (!sols)
-	fatal("malloc: %s\n", strerror(errno));
+		fatal("malloc: %s\n", strerror(errno));
+#ifdef WIN32
+    Sleep(kern_avg_run_time * 1000 / pc_freq.QuadPart);
+#else
+    nanosleep(&kern_avg_run_time, NULL);
+#endif
     check_clEnqueueReadBuffer(queue, buf_sols,
 	    CL_TRUE,	// cl_bool	blocking_read
 	    0,		// size_t	offset
@@ -791,6 +871,28 @@ uint32_t verify_sols(cl_command_queue queue, cl_mem buf_sols, uint64_t *nonce,
 	    0,		// cl_uint	num_events_in_wait_list
 	    NULL,	// cl_event	*event_wait_list
 	    NULL);	// cl_event	*event
+
+#ifdef WIN32
+	LARGE_INTEGER curr_time;
+	QueryPerformanceCounter(&curr_time);
+	LONGLONG a_diff = curr_time.QuadPart - start_time->QuadPart;
+	kern_avg_run_time = (kern_avg_run_time == 0) ? a_diff : (kern_avg_run_time * 70 / 100 + a_diff * 28 / 100);
+#else
+	struct timespec curr_time;
+	clock_gettime(CLOCK_MONOTONIC, &curr_time)
+	LONGLONG t_diff = time_diff(&start_time, curr_time);
+	double a_diff = t_diff.tv_sec * 1e9 + t_diff.tv_nsec;
+	double kern_avg = kern_avg_run_time.tv_sec * 1e9 + kern_avg_run_time.tv_nsec;
+
+	if (kern_avg == 0)
+	kern_avg = a_diff;
+	else
+	kern_avg = kern_avg * 70 / 100 + a_diff * 28 / 100; // it is 2% less than average
+	// thus allowing time to reduce
+
+	kern_avg_run_time.tv_sec = (time_t)(kern_avg / 1e9);
+	kern_avg_run_time.tv_nsec = ((long)kern_avg) % 1000000000;
+#endif
     if (sols->nr > MAX_SOLS)
       {
 	fprintf(stderr, "%d (probably invalid) solutions were dropped!\n",
@@ -832,7 +934,7 @@ unsigned get_value(unsigned *data, unsigned row)
 **
 ** Return the number of solutions found.
 */
-uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
+uint32_t solve_equihash(cl_device_id dev_id, cl_context ctx, cl_command_queue queue,
 	cl_kernel k_init_ht, cl_kernel *k_rounds, cl_kernel k_sols,
 	cl_mem *buf_ht, cl_mem buf_sols, cl_mem buf_dbg, size_t dbg_size,
 	uint8_t *header, size_t header_len, char do_increment,
@@ -880,7 +982,7 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
 	    check_clSetKernelArg(k_rounds[round], 0, &buf_blake_st);
 	    check_clSetKernelArg(k_rounds[round], 1, &buf_ht[round % 2]);
 	    check_clSetKernelArg(k_rounds[round], 2, &rowCounters[round % 2]);
-	    global_ws = select_work_size_blake();
+		global_ws = select_work_size_blake(dev_id);
 	  }
 	else
 	  {
@@ -904,10 +1006,19 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
     check_clSetKernelArg(k_sols, 3, &rowCounters[0]);
     check_clSetKernelArg(k_sols, 4, &rowCounters[1]);
     global_ws = NR_ROWS;
+
+#ifdef WIN32
+	LARGE_INTEGER start_time;
+	QueryPerformanceCounter(&start_time);
+#else
+	struct timespec start_time;
+	clock_gettime(CLOCK_MONOTONIC, &start_time);
+#endif
     check_clEnqueueNDRangeKernel(queue, k_sols, 1, NULL,
 	    &global_ws, &local_work_size, 0, NULL, NULL);
+	clFlush(queue);
     sol_found = verify_sols(queue, buf_sols, nonce_ptr, header,
-	    fixed_nonce_bytes, target, job_id, shares);
+	    fixed_nonce_bytes, target, job_id, shares, &start_time);
     clReleaseMemObject(buf_blake_st);
     return sol_found;
 }
@@ -927,30 +1038,52 @@ int read_last_line(char *buf, size_t len, int block)
     char	*start;
     size_t	pos = 0;
     ssize_t	n;
+#ifndef WIN32
     set_blocking_mode(0, block);
-    while (42)
+#endif
+	while (42)
       {
-	n = read(0, buf + pos, len - pos);
-	if (n == -1 && errno == EINTR)
-	    continue ;
-	else if (n == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
-	  {
-	    if (!pos)
-		return 0;
-	    warn("strange: a partial line was read\n");
-	    // a partial line was read, continue reading it in blocking mode
-	    // to be sure to read it completely
-	    set_blocking_mode(0, 1);
-	    continue ;
-	  }
-	else if (n == -1)
-	    fatal("read stdin: %s\n", strerror(errno));
-	else if (!n)
-	    fatal("EOF on stdin\n");
-	pos += n;
-	if (buf[pos - 1] == '\n')
-	    // 1 (or more) complete lines were read
-	    break ;
+#ifndef WIN32
+		n = read(0, buf + pos, len - pos);
+		if (n == -1 && errno == EINTR)
+			continue ;
+		else if (n == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
+			{
+			if (!pos)
+			return 0;
+			warn("strange: a partial line was read\n");
+			// a partial line was read, continue reading it in blocking mode
+			// to be sure to read it completely
+			set_blocking_mode(0, 1);
+			continue ;
+			}
+		else if (n == -1)
+			fatal("read stdin: %s\n", strerror(errno));
+		else if (!n)
+			fatal("EOF on stdin\n");
+		pos += n;
+
+		if (buf[pos - 1] == '\n')
+			// 1 (or more) complete lines were read
+			break;
+#else
+		  DWORD bytesAvailable = 0;
+		  HANDLE stdinHandle = GetStdHandle(STD_INPUT_HANDLE);
+		  PeekNamedPipe(stdinHandle, NULL, 0, NULL, &bytesAvailable, NULL);
+		  if (bytesAvailable > 0) {
+			  
+			  if (!ReadFile(stdinHandle, buf, bytesAvailable, &bytesAvailable, NULL)) {
+				  fatal("ReadFile: %d", GetLastError());
+			  }
+			  pos += bytesAvailable;
+		  }
+		  else {
+			  return 0;
+		  }
+		  if (buf[pos - 1] == '\n')
+			  // 1 (or more) complete lines were read
+			  break;
+#endif
       }
     start = memrchr(buf, '\n', pos - 1);
     if (start)
@@ -961,6 +1094,7 @@ int read_last_line(char *buf, size_t len, int block)
 	memmove(buf, start + 1, pos);
       }
     // overwrite '\n' with NUL
+
     buf[pos - 1] = 0;
     return 1;
 }
@@ -1011,7 +1145,7 @@ void mining_parse_job(char *str, uint8_t *target, size_t target_len,
     assert(str[str_i] == ' ');
     str_i++;
     *fixed_nonce_bytes = 0;
-    while (i < header_len && str[str_i])
+	while (i < header_len && str[str_i] && str[str_i] != '\n')
       {
 	header[i] = hex2val(str, str_i) * 16 + hex2val(str, str_i + 1);
 	i++;
@@ -1028,7 +1162,7 @@ void mining_parse_job(char *str, uint8_t *target, size_t target_len,
 /*
 ** Run in mining mode.
 */
-void mining_mode(cl_context ctx, cl_command_queue queue,
+void mining_mode(cl_device_id dev_id, cl_context ctx, cl_command_queue queue,
 	cl_kernel k_init_ht, cl_kernel *k_rounds, cl_kernel k_sols,
 	cl_mem *buf_ht, cl_mem buf_sols, cl_mem buf_dbg, size_t dbg_size,
 	uint8_t *header, cl_mem *rowCounters)
@@ -1043,16 +1177,27 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
     uint64_t		total_shares = 0;
     uint64_t		t0 = 0, t1;
     uint64_t		status_period = 500e3; // time (usec) between statuses
+
+    puts("SILENTARMY mining mode ready");
+    fflush(stdout);
+#ifdef WIN32
+    TIMEVAL t;
+    gettimeofday(&t, NULL);
+    srand(t.tv_usec * t.tv_sec);
+    SetConsoleOutputCP(65001);
+#endif
+
     for (i = 0; ; i++)
       {
         // iteration #0 always reads a job or else there is nothing to do
+
         if (read_last_line(line, sizeof (line), !i))
             mining_parse_job(line,
                     target, sizeof (target),
                     job_id, sizeof (job_id),
                     header, ZCASH_BLOCK_HEADER_LEN,
                     &fixed_nonce_bytes);
-        total += solve_equihash(ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
+		total += solve_equihash(dev_id, ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
                 buf_sols, buf_dbg, dbg_size, header, ZCASH_BLOCK_HEADER_LEN, 1,
                 fixed_nonce_bytes, target, job_id, &shares, rowCounters);
         total_shares += shares;
@@ -1065,7 +1210,7 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
       }
 }
 
-void run_opencl(uint8_t *header, size_t header_len, cl_context ctx,
+void run_opencl(uint8_t *header, size_t header_len, cl_device_id dev_id, cl_context ctx,
         cl_command_queue queue, cl_kernel k_init_ht, cl_kernel *k_rounds,
 	cl_kernel k_sols)
 {
@@ -1091,14 +1236,14 @@ void run_opencl(uint8_t *header, size_t header_len, cl_context ctx,
     rowCounters[0] = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, NR_ROWS, NULL);
     rowCounters[1] = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, NR_ROWS, NULL);
     if (mining)
-	mining_mode(ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
+		mining_mode(dev_id, ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
 		buf_sols, buf_dbg, dbg_size, header, rowCounters);
     fprintf(stderr, "Running...\n");
     total = 0;
     uint64_t t0 = now();
     // Solve Equihash for a few nonces
     for (nonce = 0; nonce < nr_nonces; nonce++)
-	total += solve_equihash(ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
+		total += solve_equihash(dev_id, ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
 		buf_sols, buf_dbg, dbg_size, header, header_len, !!nonce,
 		0, NULL, NULL, NULL, rowCounters);
     uint64_t t1 = now();
@@ -1228,9 +1373,12 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
     cl_program program;
     const char *source;
     size_t source_len;
-    //load_file("kernel.cl", &source, &source_len);
-    source = ocl_code;
-    source_len = strlen(ocl_code);
+#ifdef WIN32
+    load_file("input.cl", &source, &source_len);
+#else
+	source = ocl_code;
+#endif
+	source_len = strlen(source);
     program = clCreateProgramWithSource(context, 1, (const char **)&source,
 	    &source_len, &status);
     if (status != CL_SUCCESS || !program)
@@ -1239,7 +1387,7 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
     if (!mining || verbose)
 	fprintf(stderr, "Building program\n");
     status = clBuildProgram(program, 1, &dev_id,
-	    "", // compile options
+	    "-I .. -I .", // compile options
 	    NULL, NULL);
     if (status != CL_SUCCESS)
       {
@@ -1264,7 +1412,7 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
     if (status != CL_SUCCESS || !k_sols)
 	fatal("clCreateKernel (%d)\n", status);
     // Run
-    run_opencl(header, header_len, context, queue, k_init_ht, k_rounds, k_sols);
+	run_opencl(header, header_len, dev_id, context, queue, k_init_ht, k_rounds, k_sols);
     // Release resources
     assert(CL_SUCCESS == 0);
     status = CL_SUCCESS;
@@ -1287,9 +1435,9 @@ uint32_t parse_header(uint8_t *h, size_t h_len, const char *hex)
     size_t      i;
     if (!hex)
       {
-	if (!do_list_devices && !mining)
-	    fprintf(stderr, "Solving default all-zero %zd-byte header\n", opt0);
-	return opt0;
+		if (!do_list_devices && !mining)
+			fprintf(stderr, "Solving default all-zero %zd-byte header\n", opt0);
+		return opt0;
       }
     hex_len = strlen(hex);
     bin_len = hex_len / 2;
@@ -1383,12 +1531,12 @@ int main(int argc, char **argv)
                 verbose += 1;
                 break ;
             case OPT_INPUTHEADER:
-		hex_header = optarg;
-		show_encoded = 1;
-                break ;
-	    case OPT_NONCES:
-		nr_nonces = parse_num(optarg);
-		break ;
+				hex_header = optarg;
+				show_encoded = 1;
+						break ;
+				case OPT_NONCES:
+				nr_nonces = parse_num(optarg);
+				break ;
             case OPT_THREADS:
                 // ignored, this is just to conform to the contest CLI API
                 break ;
@@ -1400,19 +1548,22 @@ int main(int argc, char **argv)
                 if (PARAM_K != parse_num(optarg))
                     fatal("Unsupported k (must be %d)\n", PARAM_K);
                 break ;
-	    case OPT_LIST:
-		do_list_devices = 1;
-		break ;
-	    case OPT_USE:
-		gpu_to_use = parse_num(optarg);
-		break ;
-	    case OPT_MINING:
-		mining = 1;
-		break ;
+			case OPT_LIST:
+				do_list_devices = 1;
+				break ;
+			case OPT_USE:
+				gpu_to_use = parse_num(optarg);
+				break ;
+			case OPT_MINING:
+				mining = 1;
+				break ;
             default:
                 fatal("Try '%s --help'\n", argv[0]);
                 break ;
           }
+#ifdef WIN32
+    QueryPerformanceFrequency(&pc_freq);
+#endif
     tests();
     if (mining)
 	puts("SILENTARMY mining mode ready"), fflush(stdout);
