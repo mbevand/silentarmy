@@ -4,7 +4,7 @@
 
 [Download precompiled binaries (v5-win64standalone-r1)](https://github.com/zawawawa/silentarmy/releases/download/v5-win64standalone-r1/silentarmy-v5-win64standalone-r1.zip)
 
-This is a standalone Windows x86_64 port of SILENTARMY v5, which does not require Python, based on [Genoil's Windows port](https://github.com/Genoil/silentarmy/tree/windows).
+This is a standalone Windows x86_64 port of SILENTARMY v5, which does not require Python, based on [Genoil's Windows port](https://github.com/Genoil/silentarmy/tree/windows). The only prerequsite is [Visual C++ Redistributable for Visual Studio 2015](https://www.microsoft.com/en-us/download/details.aspx?id=48145). Please install it before running the miner if you don't have it already.
 
 All you have to do for mining is to run `list.bat` to get device ID's and edit and run `silentarmy.bat`. MAKE SURE TO SPECIFY CORRECT DEVICE IDS WITH THE `--use` OPTION! See the documentation of the original SILENTARMY below for details.
 
