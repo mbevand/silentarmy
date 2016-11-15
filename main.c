@@ -241,11 +241,20 @@ uint8_t hex2val(const char *base, size_t off)
     return 0;
 }
 
-unsigned nr_compute_units(const char *gpu)
+unsigned nr_compute_units(cl_device_id dev_id)
 {
-    if (!strcmp(gpu, "rx480")) return 36;
-    fprintf(stderr, "Unknown GPU: %s\n", gpu);
-    return 0;
+	unsigned nr_cus = 0;
+	int		 status;
+
+	status = clGetDeviceInfo(dev_id,
+		CL_DEVICE_MAX_COMPUTE_UNITS,
+		sizeof(unsigned),
+		&nr_cus, NULL);
+	
+	if (status != CL_SUCCESS)
+		fatal("clGetDeviceInfo (%d)\n", status);
+
+	return nr_cus;
 }
 
 void load_file(const char *fname, char **dat, size_t *dat_len)
@@ -526,13 +535,13 @@ void examine_dbg(cl_command_queue queue, cl_mem buf_dbg, size_t dbg_size)
     free(dbg);
 }
 
-size_t select_work_size_blake(void)
+size_t select_work_size_blake(cl_device_id dev_id)
 {
     size_t              work_size =
         64 * /* thread per wavefront */
         BLAKE_WPS * /* wavefront per simd */
         4 * /* simd per compute unit */
-        nr_compute_units("rx480");
+		nr_compute_units(dev_id);
     // Make the work group size a multiple of the nr of wavefronts, while
     // dividing the number of inputs. This results in the worksize being a
     // power of 2.
@@ -925,7 +934,7 @@ unsigned get_value(unsigned *data, unsigned row)
 **
 ** Return the number of solutions found.
 */
-uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
+uint32_t solve_equihash(cl_device_id dev_id, cl_context ctx, cl_command_queue queue,
 	cl_kernel k_init_ht, cl_kernel *k_rounds, cl_kernel k_sols,
 	cl_mem *buf_ht, cl_mem buf_sols, cl_mem buf_dbg, size_t dbg_size,
 	uint8_t *header, size_t header_len, char do_increment,
@@ -973,7 +982,7 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
 	    check_clSetKernelArg(k_rounds[round], 0, &buf_blake_st);
 	    check_clSetKernelArg(k_rounds[round], 1, &buf_ht[round % 2]);
 	    check_clSetKernelArg(k_rounds[round], 2, &rowCounters[round % 2]);
-	    global_ws = select_work_size_blake();
+		global_ws = select_work_size_blake(dev_id);
 	  }
 	else
 	  {
@@ -1153,7 +1162,7 @@ void mining_parse_job(char *str, uint8_t *target, size_t target_len,
 /*
 ** Run in mining mode.
 */
-void mining_mode(cl_context ctx, cl_command_queue queue,
+void mining_mode(cl_device_id dev_id, cl_context ctx, cl_command_queue queue,
 	cl_kernel k_init_ht, cl_kernel *k_rounds, cl_kernel k_sols,
 	cl_mem *buf_ht, cl_mem buf_sols, cl_mem buf_dbg, size_t dbg_size,
 	uint8_t *header, cl_mem *rowCounters)
@@ -1188,7 +1197,7 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
                     job_id, sizeof (job_id),
                     header, ZCASH_BLOCK_HEADER_LEN,
                     &fixed_nonce_bytes);
-        total += solve_equihash(ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
+		total += solve_equihash(dev_id, ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
                 buf_sols, buf_dbg, dbg_size, header, ZCASH_BLOCK_HEADER_LEN, 1,
                 fixed_nonce_bytes, target, job_id, &shares, rowCounters);
         total_shares += shares;
@@ -1201,7 +1210,7 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
       }
 }
 
-void run_opencl(uint8_t *header, size_t header_len, cl_context ctx,
+void run_opencl(uint8_t *header, size_t header_len, cl_device_id dev_id, cl_context ctx,
         cl_command_queue queue, cl_kernel k_init_ht, cl_kernel *k_rounds,
 	cl_kernel k_sols)
 {
@@ -1227,14 +1236,14 @@ void run_opencl(uint8_t *header, size_t header_len, cl_context ctx,
     rowCounters[0] = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, NR_ROWS, NULL);
     rowCounters[1] = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, NR_ROWS, NULL);
     if (mining)
-	mining_mode(ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
+		mining_mode(dev_id, ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
 		buf_sols, buf_dbg, dbg_size, header, rowCounters);
     fprintf(stderr, "Running...\n");
     total = 0;
     uint64_t t0 = now();
     // Solve Equihash for a few nonces
     for (nonce = 0; nonce < nr_nonces; nonce++)
-	total += solve_equihash(ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
+		total += solve_equihash(dev_id, ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
 		buf_sols, buf_dbg, dbg_size, header, header_len, !!nonce,
 		0, NULL, NULL, NULL, rowCounters);
     uint64_t t1 = now();
@@ -1403,7 +1412,7 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
     if (status != CL_SUCCESS || !k_sols)
 	fatal("clCreateKernel (%d)\n", status);
     // Run
-    run_opencl(header, header_len, context, queue, k_init_ht, k_rounds, k_sols);
+	run_opencl(header, header_len, dev_id, context, queue, k_init_ht, k_rounds, k_sols);
     // Release resources
     assert(CL_SUCCESS == 0);
     status = CL_SUCCESS;
