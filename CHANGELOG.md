@@ -1,8 +1,9 @@
 # Current tip
 
-* Implement mining.extranonce.subscribe (kenshirothefist)
+* Avoid 100% CPU usage with Nvidia's OpenCL, aka busywait fix (Kubuxu)
 * Optimization: +10% speedup, increase collision items tracked per thread
   (nerdralph). 'make test' finds 196 sols again.
+* Implement mining.extranonce.subscribe (kenshirothefist)
 
 # Version 5 (11 Nov 2016)
 

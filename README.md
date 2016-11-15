@@ -267,6 +267,7 @@ I would like to thank these persons for their contributions to SILENTARMY,
 in alphabetical order:
 * eXtremal
 * kenshirothefist
+* Kubuxu
 * lhl
 * nerdralph
 * poiuty
