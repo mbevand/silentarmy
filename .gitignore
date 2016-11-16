@@ -8,3 +8,9 @@ _temp_*
 *.tmp
 *.pyc
 tags
+.sconf_temp
+config.log
+dist
+build*/
+*.dll
+*.so
