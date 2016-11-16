@@ -1,3 +1,4 @@
+#pragma comment(lib, "winmm.lib")
 #define _GNU_SOURCE	1/* memrchr */
 #include <stdio.h>
 #include <stdlib.h>
