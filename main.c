@@ -85,11 +85,16 @@ void show_time(uint64_t t0)
 
 void set_blocking_mode(int fd, int block)
 {
+#ifndef WINDOWS_PLATFORM
     int		f;
     if (-1 == (f = fcntl(fd, F_GETFL)))
 	fatal("fcntl F_GETFL: %s\n", strerror(errno));
     if (-1 == fcntl(fd, F_SETFL, block ? (f & ~O_NONBLOCK) : (f | O_NONBLOCK)))
 	fatal("fcntl F_SETFL: %s\n", strerror(errno));
+#else
+    (void)(fd);
+    (void)(block);
+#endif
 }
 
 void randomize(void *p, ssize_t l)
@@ -917,6 +922,7 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
 */
 int read_last_line(char *buf, size_t len, int block)
 {
+#ifndef WINDOWS_PLATFORM
     char	*start;
     size_t	pos = 0;
     ssize_t	n;
@@ -956,6 +962,12 @@ int read_last_line(char *buf, size_t len, int block)
     // overwrite '\n' with NUL
     buf[pos - 1] = 0;
     return 1;
+#else
+    (void)buf;
+    (void)len;
+    (void)block;
+    return 0;
+#endif
 }
 
 /*
