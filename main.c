@@ -1163,7 +1163,7 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
     fflush(stdout);
 #ifdef WIN32
 	TIMEVAL t;
-	gettimeofday(&t1, NULL);
+	gettimeofday(&t, NULL);
 	srand(t.tv_usec * t.tv_sec);
 	SetConsoleOutputCP(65001);
 #endif
