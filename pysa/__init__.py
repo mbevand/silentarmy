@@ -1,6 +1,7 @@
 from cffi import FFI
 import os.path
 import inspect
+import pkg_resources
 
 ffi = None
 library = None
@@ -32,8 +33,8 @@ def load_library():
 
     ffi = FFI()
     ffi.cdef(library_header)
-
-    library = ffi.dlopen('libsilentarmy.so')
+    library_pathname = pkg_resources.resource_filename(__name__, 'libsilentarmy.so')
+    library = ffi.dlopen(library_pathname)
     assert library is not None
 
 
