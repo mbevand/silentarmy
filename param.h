@@ -12,10 +12,11 @@
 #define OPTIM_SIMPLIFY_ROUND		1
 
 // Number of collision items to track, per thread
-#define THREADS_PER_ROW 8
 #ifdef cl_nv_pragma_unroll // NVIDIA
-#define LDS_COLL_SIZE (NR_SLOTS * 12 * (64 / THREADS_PER_ROW))
+#define THREADS_PER_ROW 16
+#define LDS_COLL_SIZE (NR_SLOTS * 24 * (64 / THREADS_PER_ROW))
 #else
+#define THREADS_PER_ROW 8
 #define LDS_COLL_SIZE (NR_SLOTS * 8 * (64 / THREADS_PER_ROW))
 #endif
 
@@ -38,7 +39,7 @@
 // performance as they cause VRAM channel conflicts.
 #if NR_ROWS_LOG == 16
 // #error "NR_ROWS_LOG = 16 is currently broken - do not use"
-#define OVERHEAD                        3
+#define OVERHEAD                        2
 #elif NR_ROWS_LOG == 18
 #define OVERHEAD                        3
 #elif NR_ROWS_LOG == 19
@@ -50,8 +51,8 @@
 #endif
 
 #define NR_ROWS                         (1 << NR_ROWS_LOG)
-#define NR_SLOTS            ((1 << (APX_NR_ELMS_LOG - NR_ROWS_LOG)) * OVERHEAD)
-// Length of 1 element (slot) in bytes
+#define NR_SLOTS            (((1 << (APX_NR_ELMS_LOG - NR_ROWS_LOG)) * OVERHEAD))
+// Length of 1 element (slot) in byte
 #define SLOT_LEN                        32
 // Total size of hash table
 #define HT_SIZE				(NR_ROWS * NR_SLOTS * SLOT_LEN)
