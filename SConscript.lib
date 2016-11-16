@@ -1,0 +1,11 @@
+Import('lib_env')
+
+lib_src = ['gpu_solver.c']
+lib_objs = lib_env.SharedObject(lib_env['COMMON_SRC'] +
+                                lib_env['KERNEL_GEN'](lib_env) +
+                                lib_src)
+shared_lib = lib_env.SharedLibrary('silentarmy', lib_objs)
+
+# install the shared library into the python package
+lib_env.Install('#pysa', shared_lib)
+lib_env.Alias('pyinstall', '#pysa')
