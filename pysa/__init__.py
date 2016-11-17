@@ -2,6 +2,7 @@ from cffi import FFI
 import os.path
 import inspect
 import pkg_resources
+import platform
 
 ffi = None
 library = None
@@ -26,16 +27,31 @@ unsigned int gpu_solver__find_sols(struct gpu_solver *self, uint8_t *header,
                                    struct gpu_solver__encoded_solution sols[],
                                    unsigned int max_solutions);
 """
+import logging
+
+log = logging.getLogger('{0}'.format(__name__))
 
 def load_library():
     global library, ffi
     assert library is None
-
+    library_name_map_fmt = {
+        'Linux': 'lib{}.so',
+        'Windows': '{}.dll',
+    }
     ffi = FFI()
     ffi.cdef(library_header)
-    library_pathname = pkg_resources.resource_filename(__name__, 'libsilentarmy.so')
-    library = ffi.dlopen(library_pathname)
+    try:
+        library_filename = library_name_map_fmt[platform.system()].format(
+            'silentarmy')
+    except KeyError as e:
+        log.error('Unsupported system: {0}, cannot load silentarmy shared ' \
+                  'library'.format(platform.system()))
+    else:
+        library_pathname = pkg_resources.resource_filename(__name__,
+                                                           library_filename)
+        library = ffi.dlopen(library_pathname)
     assert library is not None
+    log.info('Loaded shared library: {0}'.format(library_filename))
 
 
 class Solver(object):
