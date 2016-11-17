@@ -10,6 +10,7 @@ import json
 import binascii
 import re
 import logging
+import psutil
 
 try:
     import asyncio
@@ -333,6 +334,8 @@ class Silentarmy:
 
         if sys.platform == 'win32':
             encoding = 'utf8'
+            psutil.Process(proc.pid).nice(psutil.ABOVE_NORMAL_PRIORITY_CLASS)
+            psutil.Process().nice(psutil.HIGH_PRIORITY_CLASS)
         else:
             encoding = 'ascii'
 					   
