@@ -73,11 +73,6 @@ class BuildCommand(build):
      pass
 
 
-@sconsbuild
-class DevelopCommand(develop):
-     pass
-
-
 # Get the long description from the README file
 with open(os.path.join(os.path.abspath(os.path.dirname(__file__)),
                        'README.rst'), encoding='utf-8') as f:
@@ -152,7 +147,6 @@ setup(
      },
      cmdclass={
           'build': BuildCommand,
-#          'develop': DevelopCommand,
      },
      distclass = MyDist,
 )
