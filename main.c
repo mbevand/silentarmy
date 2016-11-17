@@ -857,7 +857,7 @@ uint32_t verify_sols(cl_command_queue queue, cl_mem buf_sols, uint64_t *nonce,
     sols = (sols_t *)malloc(sizeof (*sols));
     if (!sols)
 	fatal("malloc: %s\n", strerror(errno));
-#if WIN32
+#ifdef WIN32
 	timeBeginPeriod(1);
 	DWORD duration = (DWORD)kern_avg_run_time.tv_sec * 1000 + (DWORD)kern_avg_run_time.tv_usec / 1000;
 	if (!amd_flag && duration < 1000)
