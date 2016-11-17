@@ -149,8 +149,6 @@ void randomize(void *p, ssize_t l)
     if (-1 == close(fd))
 	fatal("close %s: %s\n", fname, strerror(errno));
 #else
-	for (int i = 0; i < l; i++)
-		((uint8_t *)p)[i] = rand() & 0xff;
 	for (int i = 0; i < l; i++) {
 		unsigned int ui;
 		rand_s(&ui);
