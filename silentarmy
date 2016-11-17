@@ -458,9 +458,10 @@ class Silentarmy:
         elif method == 'mining.extranonce.subscribe':
             p = []
         elif method == 'mining.authorize':
-            p = [self.opts.user]
             if self.opts.pwd:
-                p.append(self.opts.pwd)
+                p = [self.opts.user,self.opts.pwd]
+            else:
+                p = [self.opts.user,'']
         elif method == 'mining.submit':
             (job_id, ntime, nonce_rightpart, sol) = args
             p = [self.opts.user, job_id, ntime, nonce_rightpart, sol]
