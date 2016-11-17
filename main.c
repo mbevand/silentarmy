@@ -1,4 +1,8 @@
+#ifdef WIN32
 #pragma comment(lib, "winmm.lib")
+#define _CRT_RAND_S 
+#endif
+
 #define _GNU_SOURCE	1/* memrchr */
 #include <stdio.h>
 #include <stdlib.h>
@@ -147,6 +151,11 @@ void randomize(void *p, ssize_t l)
 #else
 	for (int i = 0; i < l; i++)
 		((uint8_t *)p)[i] = rand() & 0xff;
+	for (int i = 0; i < l; i++) {
+		unsigned int ui;
+		rand_s(&ui);
+		((uint8_t *)p)[i] = ui & 0xff;
+	}
 #endif
 }
 
@@ -1162,9 +1171,6 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
     puts("SILENTARMY mining mode ready");
     fflush(stdout);
 #ifdef WIN32
-	TIMEVAL t;
-	gettimeofday(&t, NULL);
-	srand(t.tv_usec * t.tv_sec);
 	SetConsoleOutputCP(65001);
 #endif
     for (i = 0; ; i++)
