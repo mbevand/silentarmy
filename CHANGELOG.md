@@ -2,14 +2,15 @@
 
 * Avoid 100% CPU usage with Nvidia's OpenCL, aka busywait fix (Kubuxu)
 * Optimization: +10% speedup, increase collision items tracked per thread
-  (nerdralph). 'make test' finds 196 sols again.
+  (nerdralph). 'make test' finds 196 sols again
 * Implement mining.extranonce.subscribe (kenshirothefist)
+* mining.authorize sends an empty string if no password is specified
 
 # Version 5 (11 Nov 2016)
 
 * Optimization: major 2x speedup (eXtremal) by storing 8 atomic counters in
-  1 uint, and by reducing branch divergence when iterating over and XORing Xi's.
-  Note that as a result of these optimizations, sa-solver compiled with
+  1 uint, and by reducing branch divergence when iterating over and XORing Xi's;
+  note that as a result of these optimizations, sa-solver compiled with
   NR_ROWS_LOG=20 now only finds 182 out of 196 existing solutions ("make test"
   verification data was adjusted accordingly)
 * Defaulting OPTIM_SIMPLIFY_ROUND to 1; GPU memory usage down to 0.8 GB per
@@ -38,7 +39,7 @@
 * Do not abandon previous mining jobs if clean_jobs is false
 * Fix KeyError's when displaying stats
 * Be more robust about different types of network errors during connection
-* Remove bytes.hex() which was only supported on Python 3.5+.
+* Remove bytes.hex() which was only supported on Python 3.5+
 
 # Version 3 (04 Nov 2016)
 
