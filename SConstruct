@@ -12,7 +12,6 @@ OpenCL headers detection is supported
 import os
 import SCons.Scanner
 import SCons.Action
-from SCons.Script.SConsOptions import SConsIndentedHelpFormatter
 
 default_cross_prefix = 'x86_64-w64-mingw32-'
 AddOption('--cross-prefix',
