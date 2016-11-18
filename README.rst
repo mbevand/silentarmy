@@ -12,7 +12,7 @@ Local Development Build (Linux)
 
 * Rebuilding only the shared library (opencl header and library can be
   omitted when both are system wide present)::
-   scons --opencl-headers=/path/to/AMD APP SDK/3.0/include/,--opencl-library=/path/to/AMD APP SDK/3.0/bin/x86_64 pyinstall
+   scons --opencl-headers=/path/to/AMD APP SDK/3.0/include/ --opencl-library=/path/to/AMD APP SDK/3.0/bin/x86_64 pyinstall
 
 
 
