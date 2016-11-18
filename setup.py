@@ -42,7 +42,6 @@ def sconsbuild(command_subclass):
 
     def modified_finalize_options(self):
          orig_finalize_options(self)
-         library_file_name.plat_name = self.plat_name
 
     def modified_run(self):
          scons_opts_list = [s.strip() for s in self.scons_opts.split(',')]
