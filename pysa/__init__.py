@@ -31,21 +31,29 @@ import logging
 
 log = logging.getLogger('{0}'.format(__name__))
 
-def load_library():
-    global library, ffi
-    assert library is None
+def get_library_filename(system_name):
     library_name_map_fmt = {
         'Linux': 'lib{}.so',
         'Windows': '{}.dll',
     }
+    try:
+        library_filename = library_name_map_fmt[system_name].format(
+            'silentarmy')
+    except KeyError as e:
+        msg = 'Unsupported system: {0}, cannot provide system specific ' \
+              'library name'.format(system_name)
+        raise Exception(msg)
+    return library_filename
+
+def load_library():
+    global library, ffi
+    assert library is None
     ffi = FFI()
     ffi.cdef(library_header)
     try:
-        library_filename = library_name_map_fmt[platform.system()].format(
-            'silentarmy')
-    except KeyError as e:
-        log.error('Unsupported system: {0}, cannot load silentarmy shared ' \
-                  'library'.format(platform.system()))
+        library_filename = get_library_filename(platform.system())
+    except Exception as e:
+        log.error('Failed to get library filename: {}'.format(e))
     else:
         library_pathname = pkg_resources.resource_filename(__name__,
                                                            library_filename)
