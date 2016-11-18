@@ -11,12 +11,38 @@ import distutils.log
 from codecs import open
 import os
 import subprocess
+import pysa
+import sys
+import platform
 
 from setuptools.command.build_py import build_py
 from distutils.command.build import build
 from setuptools.command.install import install
 from setuptools.command.develop import develop
 
+
+def get_target_system_shared_library_name():
+     """Helper function that scans command line arguments whether platform
+     tag has been explicitely specified (indicates a cross build) and
+     tailors the system name for it
+     """
+     platform_tag_map = {
+          'win_amd64': 'Windows',
+          'win32': 'Windows',
+     }
+     target_system_name = platform.system()
+     # Check whether for platform tag presence
+     for arg in sys.argv[1:]:
+          if arg.startswith("--plat-name="):
+               plat_name = arg.split('=', 1)[1]
+               try:
+                    target_system_name = platform_tag_map[plat_name]
+               except KeyError as e:
+                    print('Unsupported platform name ({}) for cross compilation '\
+                          'specified via --plat-name'.format(plat_name))
+                    sys.exit(1)
+               break
+     return pysa.get_library_filename(target_system_name)
 
 class MyDist(Distribution):
      def has_ext_modules(self):
@@ -78,6 +104,7 @@ with open(os.path.join(os.path.abspath(os.path.dirname(__file__)),
      long_description = f.read()
 
 package = 'pysa'
+library_filename = get_target_system_shared_library_name()
 
 setup(
      name=package,
@@ -127,7 +154,7 @@ setup(
      # simple. Or you can use find_packages().
      packages=find_packages(),
 
-     eager_resources=['{0}/{1}'.format(package, library_file_name)],
+     eager_resources=['{0}/{1}'.format(package, library_filename)],
      # List run-time dependencies here.  These will be installed by pip when
      # your project is installed. For an analysis of "install_requires" vs pip's
      # requirements files see:
@@ -136,7 +163,7 @@ setup(
      install_requires=['cffi'],
 
      package_data={
-          package: ['*.so', '*.dll'],
+          package: [library_filename],
      },
      # List additional groups of dependencies here (e.g. development
      # dependencies). You can install these using the following syntax,
