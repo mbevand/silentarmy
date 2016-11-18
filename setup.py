@@ -37,7 +37,7 @@ def sconsbuild(command_subclass):
     ])
 
     def modified_initialize_options(self):
-         self.scons_opts=[]
+         self.scons_opts=''
          orig_initialize_options(self)
 
     def modified_finalize_options(self):
