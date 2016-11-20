@@ -64,6 +64,10 @@ uint32_t	gpu_to_use = 0;
 uint32_t	mining = 0;
 struct timeval kern_avg_run_time;
 int amd_flag = 0;
+const char *source = NULL;
+size_t source_len;
+const char *binary = NULL;
+size_t binary_len;
 
 typedef struct  debug_s
 {
@@ -250,13 +254,16 @@ unsigned nr_compute_units(const char *gpu)
     return 0;
 }
 
-void load_file(const char *fname, char **dat, size_t *dat_len)
+void load_file(const char *fname, char **dat, size_t *dat_len, int ignore_error)
 {
     struct stat	st;
     int		fd;
     ssize_t	ret;
-    if (-1 == (fd = open(fname, O_RDONLY | O_BINARY)))
-	fatal("%s: %s\n", fname, strerror(errno));
+	if (-1 == (fd = open(fname, O_RDONLY | O_BINARY))) {
+		if (ignore_error)
+			return;
+		fatal("%s: %s\n", fname, strerror(errno));
+	}
     if (fstat(fd, &st))
 	fatal("fstat: %s: %s\n", fname, strerror(errno));
     *dat_len = st.st_size;
@@ -291,7 +298,7 @@ void dump(const char *fname, void *data, size_t len)
 {
     int			fd;
     ssize_t		ret;
-    if (-1 == (fd = open(fname, O_WRONLY | O_CREAT | O_TRUNC, 0666)))
+    if (-1 == (fd = open(fname, O_BINARY | O_WRONLY | O_CREAT | O_TRUNC, 0666)))
 	fatal("%s: %s\n", fname, strerror(errno));
     ret = write(fd, data, len);
     if (ret == -1)
@@ -1150,52 +1157,232 @@ void mining_parse_job(char *str, uint8_t *target, size_t target_len,
 /*
 ** Run in mining mode.
 */
-void mining_mode(cl_context ctx, cl_command_queue queue,
+#ifdef WIN32
+
+#define MAX_MINING_MODE_THREADS 4
+CRITICAL_SECTION cs;
+
+struct mining_mode_thread_args {
+	cl_device_id dev_id;
+	cl_context ctx;
+	cl_command_queue queue;
+	size_t dbg_size;
+	//
+	uint8_t     header[ZCASH_BLOCK_HEADER_LEN];
+	uint8_t		target[SHA256_DIGEST_SIZE];
+	char		job_id[256];
+	size_t		fixed_nonce_bytes;
+	uint64_t		*total;
+	uint64_t		*total_shares;
+};
+
+#define ARGS ((struct mining_mode_thread_args *)args)
+DWORD mining_mode_thread(LPVOID *args)
+{
+	uint8_t     header[ZCASH_BLOCK_HEADER_LEN];
+	uint8_t		target[SHA256_DIGEST_SIZE];
+	char		job_id[256] = { '\0' };
+	size_t		fixed_nonce_bytes;
+	cl_int      status;
+	cl_program program;
+	cl_kernel k_init_ht, k_rounds[PARAM_K], k_sols;
+	cl_mem              buf_ht[2], buf_sols, buf_dbg, rowCounters[2];
+	void                *dbg = NULL;
+
+	if (binary) {
+		program = clCreateProgramWithBinary(ARGS->ctx, 1, &(ARGS->dev_id), 
+			&binary_len, (const char **)&binary, NULL, &status);
+		if (status != CL_SUCCESS || !program)
+			fatal("clCreateProgramWithBinary (%d)\n", status);
+	} else {
+		program = clCreateProgramWithSource(ARGS->ctx, 1, (const char **)&source,
+			&source_len, &status);
+		if (status != CL_SUCCESS || !program)
+			fatal("clCreateProgramWithSource (%d)\n", status);
+	}
+
+	/* Build program. */
+	if (!mining || verbose)
+		fprintf(stderr, "Building program\n");
+	status = clBuildProgram(program, 1, &(ARGS->dev_id),
+		(binary) ? "" : (amd_flag) ? ("-I .. -I . -save-temps") : ("-I .. -I ."), // compile options
+		NULL, NULL);
+	if (status != CL_SUCCESS)
+	{
+		warn("OpenCL build failed (%d). Build log follows:\n", status);
+		get_program_build_log(program, ARGS->dev_id);
+		exit(1);
+	}
+
+	// Create kernel objects
+	k_init_ht = clCreateKernel(program, "kernel_init_ht", &status);
+	if (status != CL_SUCCESS || !k_init_ht)
+		fatal("clCreateKernel (%d)\n", status);
+	for (unsigned round = 0; round < PARAM_K; round++)
+	{
+		char	name[128];
+		snprintf(name, sizeof(name), "kernel_round%d", round);
+		k_rounds[round] = clCreateKernel(program, name, &status);
+		if (status != CL_SUCCESS || !k_rounds[round])
+			fatal("clCreateKernel (%d)\n", status);
+	}
+	k_sols = clCreateKernel(program, "kernel_sols", &status);
+	if (status != CL_SUCCESS || !k_sols)
+		fatal("clCreateKernel (%d)\n", status);
+
+	// Set up buffers for the host and memory objects for the kernel
+	if (!(dbg = calloc(ARGS->dbg_size, 1)))
+		fatal("malloc: %s\n", strerror(errno));
+	buf_dbg = check_clCreateBuffer(ARGS->ctx, CL_MEM_READ_WRITE |
+		CL_MEM_COPY_HOST_PTR, ARGS->dbg_size, dbg);
+	buf_ht[0] = check_clCreateBuffer(ARGS->ctx, CL_MEM_READ_WRITE, HT_SIZE, NULL);
+	buf_ht[1] = check_clCreateBuffer(ARGS->ctx, CL_MEM_READ_WRITE, HT_SIZE, NULL);
+	buf_sols = check_clCreateBuffer(ARGS->ctx, CL_MEM_READ_WRITE, sizeof(sols_t), NULL);
+	rowCounters[0] = check_clCreateBuffer(ARGS->ctx, CL_MEM_READ_WRITE, NR_ROWS, NULL);
+	rowCounters[1] = check_clCreateBuffer(ARGS->ctx, CL_MEM_READ_WRITE, NR_ROWS, NULL);
+
+	while (1) {
+		EnterCriticalSection(&cs);
+		if (memcmp(ARGS->job_id, job_id, sizeof(job_id))) {
+			memcpy(target, ARGS->target, sizeof(target));
+			memcpy(job_id, ARGS->job_id, sizeof(job_id));
+			memcpy(header, ARGS->header, ZCASH_BLOCK_HEADER_LEN);
+			fixed_nonce_bytes = ARGS->fixed_nonce_bytes;
+		}
+		LeaveCriticalSection(&cs);
+
+		uint32_t shares;
+		uint32_t num_sols = solve_equihash(ARGS->ctx, ARGS->queue, k_init_ht, k_rounds, k_sols, buf_ht,
+			buf_sols, buf_dbg, ARGS->dbg_size, header, ZCASH_BLOCK_HEADER_LEN, 1,
+			fixed_nonce_bytes, target, job_id, &shares, rowCounters);
+
+		EnterCriticalSection(&cs);
+		*(ARGS->total) += num_sols;
+		*(ARGS->total_shares) += shares;
+		LeaveCriticalSection(&cs);
+	}
+}
+
+void mining_mode(cl_device_id dev_id, cl_program program, cl_context ctx, cl_command_queue queue,
 	cl_kernel k_init_ht, cl_kernel *k_rounds, cl_kernel k_sols,
 	cl_mem *buf_ht, cl_mem buf_sols, cl_mem buf_dbg, size_t dbg_size,
 	uint8_t *header, cl_mem *rowCounters)
 {
-    char		line[4096];
-    uint8_t		target[SHA256_DIGEST_SIZE];
-    char		job_id[256];
-    size_t		fixed_nonce_bytes = 0;
-    uint64_t		i;
-    uint64_t		total = 0;
-    uint32_t		shares;
-    uint64_t		total_shares = 0;
-    uint64_t		t0 = 0, t1;
-    uint64_t		status_period = 500e3; // time (usec) between statuses
+	char		line[4096];
+	uint8_t		target[SHA256_DIGEST_SIZE];
+	char		job_id[256];
+	size_t		fixed_nonce_bytes = 0;
+	uint64_t		i;
+	uint64_t		total = 0;
+	uint32_t		shares;
+	uint64_t		total_shares = 0;
+	uint64_t		t0 = 0, t1;
+	uint64_t		status_period = 500e3; // time (usec) between statuses
+	cl_int          status;
+	struct mining_mode_thread_args args[MAX_MINING_MODE_THREADS];
 
-    puts("SILENTARMY mining mode ready");
-    fflush(stdout);
+	InitializeCriticalSection(&cs);
+
+	puts("SILENTARMY mining mode ready");
+	fflush(stdout);
+	SetConsoleOutputCP(65001);
+	for (i = 0; ; i++)
+	{
+		// iteration #0 always reads a job or else there is nothing to do
+
+		if (read_last_line(line, sizeof(line), !i)) {
+			EnterCriticalSection(&cs);
+			for (int thread_index = 0; thread_index < MAX_MINING_MODE_THREADS; ++thread_index) {
+				mining_parse_job(line,
+					target, sizeof(target),
+					job_id, sizeof(job_id),
+					header, ZCASH_BLOCK_HEADER_LEN,
+					&fixed_nonce_bytes);
+				memcpy(args[thread_index].target, target, sizeof(target));
+				memcpy(args[thread_index].job_id, job_id, sizeof(job_id));
+				memcpy(args[thread_index].header, header, ZCASH_BLOCK_HEADER_LEN);
+				args[thread_index].fixed_nonce_bytes = fixed_nonce_bytes;
+				if (!i) {
+					args[thread_index].dev_id = dev_id;
+					args[thread_index].ctx = ctx;
+					args[thread_index].queue = queue;
+					args[thread_index].dbg_size = dbg_size;
+					args[thread_index].total = &total;
+					args[thread_index].total_shares = &total_shares;
+					CreateThread(
+						NULL,                   // default security attributes
+						0,                      // use default stack size  
+						mining_mode_thread,     // thread function name
+						&args[thread_index],    // argument to thread function 
+						0,                      // use default creation flags 
+						NULL);                  // returns the thread identifier 
+				}
+			}
+			LeaveCriticalSection(&cs);
+		}
+		
+		Sleep(status_period / 1000);
+
+		if ((t1 = now()) > t0 + status_period)
+		{
+			EnterCriticalSection(&cs);
+			t0 = t1;
+			printf("status: %" PRId64 " %" PRId64 "\n", total, total_shares);
+			fflush(stdout);
+			LeaveCriticalSection(&cs);
+		}
+	}
+}
+#else
+void mining_mode(cl_device_id *dev_id, cl_context ctx, cl_command_queue queue,
+	cl_kernel k_init_ht, cl_kernel *k_rounds, cl_kernel k_sols,
+	cl_mem *buf_ht, cl_mem buf_sols, cl_mem buf_dbg, size_t dbg_size,
+	uint8_t *header, cl_mem *rowCounters)
+{
+	char		line[4096];
+	uint8_t		target[SHA256_DIGEST_SIZE];
+	char		job_id[256];
+	size_t		fixed_nonce_bytes = 0;
+	uint64_t		i;
+	uint64_t		total = 0;
+	uint32_t		shares;
+	uint64_t		total_shares = 0;
+	uint64_t		t0 = 0, t1;
+	uint64_t		status_period = 500e3; // time (usec) between statuses
+	cl_int          status;
+
+	puts("SILENTARMY mining mode ready");
+	fflush(stdout);
 #ifdef WIN32
 	SetConsoleOutputCP(65001);
 #endif
-    for (i = 0; ; i++)
-      {
-        // iteration #0 always reads a job or else there is nothing to do
+	for (i = 0; ; i++)
+	{
+		// iteration #0 always reads a job or else there is nothing to do
 
-        if (read_last_line(line, sizeof (line), !i))
-            mining_parse_job(line,
-                    target, sizeof (target),
-                    job_id, sizeof (job_id),
-                    header, ZCASH_BLOCK_HEADER_LEN,
-                    &fixed_nonce_bytes);
-        total += solve_equihash(ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
-                buf_sols, buf_dbg, dbg_size, header, ZCASH_BLOCK_HEADER_LEN, 1,
-                fixed_nonce_bytes, target, job_id, &shares, rowCounters);
-        total_shares += shares;
-        if ((t1 = now()) > t0 + status_period)
-          {
-            t0 = t1;
-            printf("status: %" PRId64 " %" PRId64 "\n", total, total_shares);
-            fflush(stdout);
-          }
-      }
+		if (read_last_line(line, sizeof(line), !i)) {
+			mining_parse_job(line,
+				target, sizeof(target),
+				job_id, sizeof(job_id),
+				header, ZCASH_BLOCK_HEADER_LEN,
+				&fixed_nonce_bytes);
+		}
+		total += solve_equihash(ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
+			buf_sols, buf_dbg, dbg_size, header, ZCASH_BLOCK_HEADER_LEN, 1,
+			fixed_nonce_bytes, target, job_id, &shares, rowCounters);
+		total_shares += shares;
+		if ((t1 = now()) > t0 + status_period)
+		{
+			t0 = t1;
+			printf("status: %" PRId64 " %" PRId64 "\n", total, total_shares);
+			fflush(stdout);
+		}
+	}
 }
+#endif
 
-void run_opencl(uint8_t *header, size_t header_len, cl_context ctx,
-        cl_command_queue queue, cl_kernel k_init_ht, cl_kernel *k_rounds,
+void run_opencl(uint8_t *header, size_t header_len, cl_device_id *dev_id, cl_context ctx,
+        cl_command_queue queue, cl_program program, cl_kernel k_init_ht, cl_kernel *k_rounds,
 	cl_kernel k_sols)
 {
     cl_mem              buf_ht[2], buf_sols, buf_dbg, rowCounters[2];
@@ -1209,18 +1396,24 @@ void run_opencl(uint8_t *header, size_t header_len, cl_context ctx,
     uint64_t		total;
     if (!mining || verbose)
 	fprintf(stderr, "Hash tables will use %.1f MB\n", 2.0 * HT_SIZE / 1e6);
-    // Set up buffers for the host and memory objects for the kernel
-    if (!(dbg = calloc(dbg_size, 1)))
-	fatal("malloc: %s\n", strerror(errno));
-    buf_dbg = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE |
-	    CL_MEM_COPY_HOST_PTR, dbg_size, dbg);
-    buf_ht[0] = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, HT_SIZE, NULL);
-    buf_ht[1] = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, HT_SIZE, NULL);
-    buf_sols = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof (sols_t), NULL);
-    rowCounters[0] = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, NR_ROWS, NULL);
-    rowCounters[1] = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, NR_ROWS, NULL);
-    if (mining)
-	mining_mode(ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
+#ifdef WIN32
+	if (!mining) {
+#endif
+		// Set up buffers for the host and memory objects for the kernel
+		if (!(dbg = calloc(dbg_size, 1)))
+			fatal("malloc: %s\n", strerror(errno));
+		buf_dbg = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE |
+			CL_MEM_COPY_HOST_PTR, dbg_size, dbg);
+		buf_ht[0] = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, HT_SIZE, NULL);
+		buf_ht[1] = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, HT_SIZE, NULL);
+		buf_sols = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(sols_t), NULL);
+		rowCounters[0] = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, NR_ROWS, NULL);
+		rowCounters[1] = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, NR_ROWS, NULL);
+#ifdef WIN32
+	}
+#endif
+	if (mining)
+	mining_mode(*dev_id, program, ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
 		buf_sols, buf_dbg, dbg_size, header, rowCounters);
     fprintf(stderr, "Running...\n");
     total = 0;
@@ -1355,49 +1548,56 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
     if (status != CL_SUCCESS || !queue)
 	fatal("clCreateCommandQueue (%d)\n", status);
     /* Create program object */
-    cl_program program;
-    const char *source;
-    size_t source_len;
 #ifdef WIN32
-    load_file("input.cl", &source, &source_len);
+	load_file("input.cl", &source, &source_len, 0);
+	load_file("input.bin", &binary, &binary_len, 1);
 #else
 	source = ocl_code;
 #endif
 	source_len = strlen(source);
-    program = clCreateProgramWithSource(context, 1, (const char **)&source,
-	    &source_len, &status);
-    if (status != CL_SUCCESS || !program)
-	fatal("clCreateProgramWithSource (%d)\n", status);
-    /* Build program. */
-    if (!mining || verbose)
-	fprintf(stderr, "Building program\n");
-    status = clBuildProgram(program, 1, &dev_id,
-	    (amd_flag) ? ("-I .. -I .") : ("-I .. -I ."), // compile options
-	    NULL, NULL);
-    if (status != CL_SUCCESS)
-      {
-        warn("OpenCL build failed (%d). Build log follows:\n", status);
-        get_program_build_log(program, dev_id);
-	exit(1);
-      }
-    //get_program_bins(program);
-    // Create kernel objects
-    cl_kernel k_init_ht = clCreateKernel(program, "kernel_init_ht", &status);
-    if (status != CL_SUCCESS || !k_init_ht)
-	fatal("clCreateKernel (%d)\n", status);
-    for (unsigned round = 0; round < PARAM_K; round++)
-      {
-	char	name[128];
-	snprintf(name, sizeof (name), "kernel_round%d", round);
-	k_rounds[round] = clCreateKernel(program, name, &status);
-	if (status != CL_SUCCESS || !k_rounds[round])
-	    fatal("clCreateKernel (%d)\n", status);
-      }
-    cl_kernel k_sols = clCreateKernel(program, "kernel_sols", &status);
-    if (status != CL_SUCCESS || !k_sols)
-	fatal("clCreateKernel (%d)\n", status);
+	cl_program program;
+	cl_kernel k_init_ht;
+	cl_kernel k_sols;
+#ifdef WIN32
+	if (!mining) {
+#endif
+		program = clCreateProgramWithSource(context, 1, (const char **)&source,
+			&source_len, &status);
+		if (status != CL_SUCCESS || !program)
+			fatal("clCreateProgramWithSource (%d)\n", status);
+		/* Build program. */
+		if (!mining || verbose)
+			fprintf(stderr, "Building program\n");
+		status = clBuildProgram(program, 1, &dev_id,
+			(amd_flag) ? ("-I .. -I . -save-temps") : ("-I .. -I ."), // compile options
+			NULL, NULL);
+		if (status != CL_SUCCESS)
+		{
+			warn("OpenCL build failed (%d). Build log follows:\n", status);
+			get_program_build_log(program, dev_id);
+			exit(1);
+		}
+		get_program_bins(program);
+		// Create kernel objects
+		k_init_ht = clCreateKernel(program, "kernel_init_ht", &status);
+		if (status != CL_SUCCESS || !k_init_ht)
+			fatal("clCreateKernel (%d)\n", status);
+		for (unsigned round = 0; round < PARAM_K; round++)
+		{
+			char	name[128];
+			snprintf(name, sizeof(name), "kernel_round%d", round);
+			k_rounds[round] = clCreateKernel(program, name, &status);
+			if (status != CL_SUCCESS || !k_rounds[round])
+				fatal("clCreateKernel (%d)\n", status);
+		}
+		k_sols = clCreateKernel(program, "kernel_sols", &status);
+		if (status != CL_SUCCESS || !k_sols)
+			fatal("clCreateKernel (%d)\n", status);
+#ifdef WIN32
+	}
+#endif
     // Run
-    run_opencl(header, header_len, context, queue, k_init_ht, k_rounds, k_sols);
+    run_opencl(header, header_len, &dev_id, context, queue, program, k_init_ht, k_rounds, k_sols);
     // Release resources
     assert(CL_SUCCESS == 0);
     status = CL_SUCCESS;
