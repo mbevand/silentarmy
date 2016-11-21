@@ -1159,6 +1159,7 @@ void mining_parse_job(char *str, uint8_t *target, size_t target_len,
 */
 #ifdef WIN32
 
+uint32_t num_mining_mode_threads = DEFAULT_NUM_MINING_MODE_THREADS;
 CRITICAL_SECTION cs;
 
 struct mining_mode_thread_args {
@@ -1278,7 +1279,7 @@ void mining_mode(cl_device_id dev_id, cl_program program, cl_context ctx, cl_com
 	uint64_t		t0 = 0, t1;
 	uint64_t		status_period = 500e3; // time (usec) between statuses
 	cl_int          status;
-	struct mining_mode_thread_args args[MAX_MINING_MODE_THREADS];
+	struct mining_mode_thread_args args[MAX_NUM_MINING_MODE_THREADS];
 
 	InitializeCriticalSection(&cs);
 
@@ -1291,7 +1292,7 @@ void mining_mode(cl_device_id dev_id, cl_program program, cl_context ctx, cl_com
 
 		if (read_last_line(line, sizeof(line), !i)) {
 			EnterCriticalSection(&cs);
-			for (int thread_index = 0; thread_index < MAX_MINING_MODE_THREADS; ++thread_index) {
+			for (int thread_index = 0; thread_index < num_mining_mode_threads; ++thread_index) {
 				mining_parse_job(line,
 					target, sizeof(target),
 					job_id, sizeof(job_id),
@@ -1722,8 +1723,14 @@ int main(int argc, char **argv)
 				nr_nonces = parse_num(optarg);
 				break ;
             case OPT_THREADS:
-                // ignored, this is just to conform to the contest CLI API
-                break ;
+#ifdef WIN32
+				num_mining_mode_threads = parse_num(optarg);
+				if (num_mining_mode_threads < 1)
+					num_mining_mode_threads = 1;
+				else if (num_mining_mode_threads > MAX_NUM_MINING_MODE_THREADS)
+					num_mining_mode_threads = MAX_NUM_MINING_MODE_THREADS;
+#endif
+				break ;
             case OPT_N:
                 if (PARAM_N != parse_num(optarg))
                     fatal("Unsupported n (must be %d)\n", PARAM_N);

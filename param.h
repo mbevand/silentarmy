@@ -123,4 +123,5 @@ typedef struct	sols_s
 }		sols_t;
 
 // Windows only for now
-#define MAX_MINING_MODE_THREADS 4
+#define DEFAULT_NUM_MINING_MODE_THREADS 1
+#define MAX_NUM_MINING_MODE_THREADS 16
