@@ -1159,7 +1159,6 @@ void mining_parse_job(char *str, uint8_t *target, size_t target_len,
 */
 #ifdef WIN32
 
-#define MAX_MINING_MODE_THREADS 4
 CRITICAL_SECTION cs;
 
 struct mining_mode_thread_args {
