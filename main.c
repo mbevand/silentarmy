@@ -1204,7 +1204,7 @@ DWORD mining_mode_thread(LPVOID *args)
 	if (!mining || verbose)
 		fprintf(stderr, "Building program\n");
 	status = clBuildProgram(program, 1, &(ARGS->dev_id),
-		(binary) ? "" : (amd_flag) ? ("-I .. -I . -save-temps") : ("-I .. -I ."), // compile options
+		(binary) ? "" : (amd_flag) ? ("-I .. -I .") : ("-I .. -I ."), // compile options
 		NULL, NULL);
 	if (status != CL_SUCCESS)
 	{
