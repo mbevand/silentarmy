@@ -6,23 +6,17 @@
 #define APX_NR_ELMS_LOG                 (PREFIX + 1)
 // Number of rows and slots is affected by this. 20 offers the best performance
 // but occasionally misses ~1% of solutions.
-#ifdef cl_nv_pragma_unroll // NVIDIA
-#define NR_ROWS_LOG                     16
-#else
 #define NR_ROWS_LOG                     18
-#endif
 
 // Setting this to 1 might make SILENTARMY faster, see TROUBLESHOOTING.md
 #define OPTIM_SIMPLIFY_ROUND		1
 
 // Number of collision items to track, per thread
 #ifdef cl_nv_pragma_unroll // NVIDIA
-#define THREADS_PER_ROW 32
-#define ROWS_PER_WORKGROUP (64/THREADS_PER_ROW)
+#define THREADS_PER_ROW 16
 #define LDS_COLL_SIZE (NR_SLOTS * 24 * (64 / THREADS_PER_ROW))
 #else
 #define THREADS_PER_ROW 8
-#define ROWS_PER_WORKGROUP (64/THREADS_PER_ROW)
 #define LDS_COLL_SIZE (NR_SLOTS * 8 * (64 / THREADS_PER_ROW))
 #endif
 
@@ -46,16 +40,10 @@
 #if NR_ROWS_LOG == 16
 // #error "NR_ROWS_LOG = 16 is currently broken - do not use"
 #define OVERHEAD                        2
-#define COLLISION_TYPES_NUM             16u
-#define COLLISION_BUFFER_SIZE           16u
 #elif NR_ROWS_LOG == 18
 #define OVERHEAD                        3
-#define COLLISION_TYPES_NUM             4u
-#define COLLISION_BUFFER_SIZE           16u
 #elif NR_ROWS_LOG == 19
 #define OVERHEAD                        5
-#define COLLISION_TYPES_NUM             2u
-#define COLLISION_BUFFER_SIZE           16u
 #elif NR_ROWS_LOG == 20 && OPTIM_SIMPLIFY_ROUND
 #define OVERHEAD                        6
 #elif NR_ROWS_LOG == 20
