@@ -1,8 +1,6 @@
 # SILENTARMY Standalone Version for Windows x86_64
 
-[Download precompiled binaries (v5-win64standalone-r8)](https://github.com/zawawawa/silentarmy/releases/download/v5-win64standalone-r8/silentarmy-v5-win64standalone-r8.zip) (Developmental)
-
-[Download precompiled binaries (v5-win64standalone-r7)](https://github.com/zawawawa/silentarmy/releases/download/v5-win64standalone-r7/silentarmy-v5-win64standalone-r7.zip) (Stable)
+[Download precompiled binaries (v5-win64standalone-r8)](https://github.com/zawawawa/silentarmy/releases/download/v5-win64standalone-r8/silentarmy-v5-win64standalone-r8.zip)
 
 This is a standalone Windows x86_64 port of SILENTARMY v5, which does not require Python, based on [Genoil's Windows port](https://github.com/Genoil/silentarmy/tree/windows). All you have to do for mining is to run `list.bat` to get device ID's and edit and run `silentarmy.bat`. MAKE SURE TO SPECIFY CORRECT DEVICE IDS WITH THE `--use` OPTION! See the documentation of the original SILENTARMY below for details.
 
