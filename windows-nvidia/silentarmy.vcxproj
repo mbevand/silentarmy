@@ -93,7 +93,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NVIDIA;WIN32;_DEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -106,7 +106,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_WARNINGS;_DEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NVIDIA;WIN32;_CRT_SECURE_NO_WARNINGS;_DEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(AMDAPPSDKROOT)/include;$(CUDA_INC_PATH)%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -124,7 +124,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NVIDIA;WIN32;NDEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -141,7 +141,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_WARNINGS;NDEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NVIDIA;WIN32;_CRT_SECURE_NO_WARNINGS;NDEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(AMDAPPSDKROOT)/include;$(CUDA_INC_PATH)%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -155,10 +155,9 @@
     <PostBuildEvent>
       <Command>pyinstaller  -y $(SolutionDir)\..\silentarmy.py 
 copy  $(SolutionDir)\..\sa-solver.exe $(SolutionDir)\dist\silentarmy\
-copy  $(SolutionDir)\..\input.cl $(SolutionDir)\dist\silentarmy\
-copy  $(SolutionDir)\..\param.h $(SolutionDir)\dist\silentarmy\
-copy  $(SolutionDir)\..\input-nvidia.cl $(SolutionDir)\dist\silentarmy\
-copy  $(SolutionDir)\..\param-nvidia.h $(SolutionDir)\dist\silentarmy\
+copy  $(SolutionDir)\..\input-nvidia.cl $(SolutionDir)\dist\silentarmy\input.cl
+copy  $(SolutionDir)\..\param-nvidia.h $(SolutionDir)\dist\silentarmy\param.h
+copy  $(SolutionDir)\..\xor.cl $(SolutionDir)\dist\silentarmy\
 copy  $(SolutionDir)\..\silentarmy.bat $(SolutionDir)\dist\silentarmy\
 copy  $(SolutionDir)\..\list.bat $(SolutionDir)\dist\silentarmy\
 copy  $(SolutionDir)\..\README.md $(SolutionDir)\dist\silentarmy\
@@ -176,14 +175,12 @@ copy  $(SolutionDir)\..\kernel-eXtremal-NVIDIA-20161120.zip $(SolutionDir)\dist\
   <ItemGroup>
     <ClInclude Include="..\blake.h" />
     <ClInclude Include="..\param-nvidia.h" />
-    <ClInclude Include="..\param.h" />
     <ClInclude Include="getopt.h" />
     <ClInclude Include="gettimeofday.h" />
     <ClInclude Include="memrchr.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\input-nvidia.cl" />
-    <None Include="..\input.cl" />
     <None Include="..\silentarmy.py" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

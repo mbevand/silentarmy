@@ -51,7 +51,11 @@ typedef SSIZE_T ssize_t;
 
 typedef uint8_t		uchar;
 typedef uint32_t	uint;
+#ifdef NVIDIA
+#include "param-nvidia.h"
+#else
 #include "param.h"
+#endif
 
 #define MIN(A, B)	(((A) < (B)) ? (A) : (B))
 #define MAX(A, B)	(((A) > (B)) ? (A) : (B))
@@ -945,7 +949,7 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
 	blake2b_state_t     blake;
 	cl_mem              buf_blake_st;
 	size_t		global_ws;
-	size_t              local_work_size = 64;
+	size_t              local_work_size = THRD;
 	uint32_t		sol_found = 0;
 	uint64_t		*nonce_ptr;
 	assert(header_len == ZCASH_BLOCK_HEADER_LEN);
@@ -1159,6 +1163,10 @@ void mining_parse_job(char *str, uint8_t *target, size_t target_len,
 */
 #ifdef WIN32
 
+#ifndef DEFAULT_NUM_MINING_MODE_THREADS
+#define DEFAULT_NUM_MINING_MODE_THREADS 1
+#define MAX_NUM_MINING_MODE_THREADS 16
+#endif
 uint32_t num_mining_mode_threads = DEFAULT_NUM_MINING_MODE_THREADS;
 CRITICAL_SECTION cs;
 
