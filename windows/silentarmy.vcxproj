@@ -159,10 +159,9 @@ copy  $(SolutionDir)\..\input.cl $(SolutionDir)\dist\silentarmy\
 copy  $(SolutionDir)\..\param.h $(SolutionDir)\dist\silentarmy\
 copy  $(SolutionDir)\..\silentarmy.bat $(SolutionDir)\dist\silentarmy\
 copy  $(SolutionDir)\..\list.bat $(SolutionDir)\dist\silentarmy\
-
 copy  $(SolutionDir)\..\README.md $(SolutionDir)\dist\silentarmy\
 copy  $(SolutionDir)\..\vcruntime140.dll $(SolutionDir)\dist\silentarmy\
-
+copy  $(SolutionDir)\..\kernel-eXtremal-NVIDIA-20161120.zip $(SolutionDir)\dist\silentarmy\
 </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
