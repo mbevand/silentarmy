@@ -1298,31 +1298,42 @@ void mining_mode(cl_device_id dev_id, cl_program program, cl_context ctx, cl_com
 					job_id, sizeof(job_id),
 					header, ZCASH_BLOCK_HEADER_LEN,
 					&fixed_nonce_bytes);
-				memcpy(args[thread_index].target, target, sizeof(target));
-				memcpy(args[thread_index].job_id, job_id, sizeof(job_id));
-				memcpy(args[thread_index].header, header, ZCASH_BLOCK_HEADER_LEN);
-				args[thread_index].fixed_nonce_bytes = fixed_nonce_bytes;
-				if (!i) {
-					args[thread_index].dev_id = dev_id;
-					args[thread_index].ctx = ctx;
-					args[thread_index].queue = queue;
-					args[thread_index].dbg_size = dbg_size;
-					args[thread_index].total = &total;
-					args[thread_index].total_shares = &total_shares;
-					CreateThread(
-						NULL,                   // default security attributes
-						0,                      // use default stack size  
-						mining_mode_thread,     // thread function name
-						&args[thread_index],    // argument to thread function 
-						0,                      // use default creation flags 
-						NULL);                  // returns the thread identifier 
+				if (num_mining_mode_threads > 1) {
+					memcpy(args[thread_index].target, target, sizeof(target));
+					memcpy(args[thread_index].job_id, job_id, sizeof(job_id));
+					memcpy(args[thread_index].header, header, ZCASH_BLOCK_HEADER_LEN);
+					args[thread_index].fixed_nonce_bytes = fixed_nonce_bytes;
+					if (!i) {
+						args[thread_index].dev_id = dev_id;
+						args[thread_index].ctx = ctx;
+						args[thread_index].queue = queue;
+						args[thread_index].dbg_size = dbg_size;
+						args[thread_index].total = &total;
+						args[thread_index].total_shares = &total_shares;
+						CreateThread(
+							NULL,                   // default security attributes
+							0,                      // use default stack size  
+							mining_mode_thread,     // thread function name
+							&args[thread_index],    // argument to thread function 
+							0,                      // use default creation flags 
+							NULL);                  // returns the thread identifier 
+					}
 				}
 			}
 			LeaveCriticalSection(&cs);
 		}
 		
-		Sleep(status_period / 1000);
-
+		if (num_mining_mode_threads <= 1) {
+			uint32_t shares;
+			uint32_t num_sols = solve_equihash(ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
+				buf_sols, buf_dbg, dbg_size, header, ZCASH_BLOCK_HEADER_LEN, 1,
+				fixed_nonce_bytes, target, job_id, &shares, rowCounters);
+			total += num_sols;
+			total_shares += shares;
+		}
+		else {
+			Sleep(status_period / 1000);
+		}
 		if ((t1 = now()) > t0 + status_period)
 		{
 			EnterCriticalSection(&cs);
@@ -1397,7 +1408,7 @@ void run_opencl(uint8_t *header, size_t header_len, cl_device_id *dev_id, cl_con
     if (!mining || verbose)
 	fprintf(stderr, "Hash tables will use %.1f MB\n", 2.0 * HT_SIZE / 1e6);
 #ifdef WIN32
-	if (!mining) {
+	if (!mining || num_mining_mode_threads <= 1) {
 #endif
 		// Set up buffers for the host and memory objects for the kernel
 		if (!(dbg = calloc(dbg_size, 1)))
@@ -1559,7 +1570,7 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
 	cl_kernel k_init_ht;
 	cl_kernel k_sols;
 #ifdef WIN32
-	if (!mining) {
+	if (!mining || num_mining_mode_threads <= 1) {
 #endif
 		program = clCreateProgramWithSource(context, 1, (const char **)&source,
 			&source_len, &status);
@@ -1569,7 +1580,7 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
 		if (!mining || verbose)
 			fprintf(stderr, "Building program\n");
 		status = clBuildProgram(program, 1, &dev_id,
-			(amd_flag) ? ("-I .. -I . -save-temps") : ("-I .. -I ."), // compile options
+			(amd_flag) ? ("-I .. -I .") : ("-I .. -I ."), // compile options
 			NULL, NULL);
 		if (status != CL_SUCCESS)
 		{
