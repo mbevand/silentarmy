@@ -237,8 +237,8 @@ class Silentarmy:
                 else:
                     result.append((gpuid, 0))
             return result
-        period_glo = 300 # total sol/s rate is computed over <period_glo> sec
-        period_gpu = 30 # per-GPU sol/s rate is computed over <period_gpu> sec
+        period_glo = 30 # total sol/s rate is computed over <period_glo> sec
+        period_gpu = 10 # per-GPU sol/s rate is computed over <period_gpu> sec
         last_sols = []
         last_times = []
         while True:
