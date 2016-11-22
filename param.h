@@ -109,3 +109,7 @@ typedef struct	sols_s
 	uchar	valid[MAX_SOLS];
 	uint	values[MAX_SOLS][(1 << PARAM_K)];
 }		sols_t;
+
+// Windows only for now
+#define DEFAULT_NUM_MINING_MODE_THREADS 1
+#define MAX_NUM_MINING_MODE_THREADS 16
