@@ -1,6 +1,6 @@
 # SILENTARMY Standalone Version for Windows x86_64
 
-[Download precompiled binaries (v5-win64standalone-r12)](https://github.com/zawawawa/silentarmy/releases/download/v5-win64standalone-r12/silentarmy-v5-win64standalone-r12.zip) (Developmental)
+[Download precompiled binaries (v5-win64standalone-r12)](https://github.com/zawawawa/silentarmy/releases/tag/v5-win64standalone-r12) (Developmental)
 
 [Download precompiled binaries (v5-win64standalone-r7)](https://github.com/zawawawa/silentarmy/releases/download/v5-win64standalone-r7/silentarmy-v5-win64standalone-r7.zip) (Stable)
 
