@@ -949,7 +949,7 @@ uint32_t solve_equihash(cl_context ctx, cl_command_queue queue,
 	blake2b_state_t     blake;
 	cl_mem              buf_blake_st;
 	size_t		global_ws;
-	size_t              local_work_size = THRD;
+	size_t              local_work_size = 64;
 	uint32_t		sol_found = 0;
 	uint64_t		*nonce_ptr;
 	assert(header_len == ZCASH_BLOCK_HEADER_LEN);
