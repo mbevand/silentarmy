@@ -116,7 +116,9 @@ solver_env.Append(VARIANT_DIR='build-solver')
 # Don't compile the pure solver binary for windows as some parts have
 # been disabled for mingw compilation
 if not GetOption('enable_win_cross_build'):
-    solver_env.SConscript('SConscript.solver', variant_dir=solver_env['VARIANT_DIR'],
-                          exports='solver_env', duplicate=0)
-lib_env.SConscript('SConscript.lib', variant_dir=lib_env['VARIANT_DIR'],
-                   exports='lib_env', duplicate=0)
+    solver_env.SConscript('SConscript.solver', exports={'env': solver_env},
+                          variant_dir=solver_env['VARIANT_DIR'],
+                          duplicate=0)
+lib_env.SConscript('SConscript.lib', exports={'env': lib_env},
+                   variant_dir=lib_env['VARIANT_DIR'],
+                   duplicate=0)

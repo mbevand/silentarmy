@@ -1,5 +1,4 @@
-Import('solver_env')
+Import('env')
 
-solver_objs = solver_env.Object(solver_env['COMMON_SRC'] +
-                                solver_env['KERNEL_GEN'](solver_env))
-solver_env.Program('sa-solver', solver_objs)
+solver_objs = env.Object(env['COMMON_SRC'] + env['KERNEL_GEN'](env))
+env.Program('sa-solver', solver_objs)
