@@ -10,6 +10,7 @@ import json
 import binascii
 import re
 import logging
+import psutil
 
 try:
     import asyncio
@@ -148,7 +149,8 @@ class Silentarmy:
         self.loop = None
         # Solver-related attributes
         self.solver_procs = {}
-        self.solver_binary = os.path.join(sys.path[0], 'sa-solver')
+        #self.solver_binary = os.path.join(sys.path[0], 'sa-solver')
+        self.solver_binary = 'sa-solver'
         # Stratum-related attributes
         self.st_transport = None
         self.st_conn_attempt = 0
@@ -235,8 +237,8 @@ class Silentarmy:
                 else:
                     result.append((gpuid, 0))
             return result
-        period_glo = 30 # total sol/s rate is computed over <period_glo> sec
-        period_gpu = 10 # per-GPU sol/s rate is computed over <period_gpu> sec
+        period_glo = 300 # total sol/s rate is computed over <period_glo> sec
+        period_gpu = 30 # per-GPU sol/s rate is computed over <period_gpu> sec
         last_sols = []
         last_times = []
         while True:
@@ -285,7 +287,7 @@ class Silentarmy:
         for gpuid in self.opts.use:
             for instid in range(self.opts.instances):
                 devid = "%d.%d" % (gpuid, instid)
-                my_ensure_future(self.start_solvers(devid))
+                my_ensure_future(self.start_solvers(devid, self.opts.threads))
         try:
             self.loop.run_forever()
         except KeyboardInterrupt as e:
@@ -305,11 +307,11 @@ class Silentarmy:
             del self.solver_procs[devid]
 
     @asyncio.coroutine
-    def start_solvers(self, devid):
+    def start_solvers(self, devid, threads):
         verbose('Solver %s: launching' % devid)
         # execute "sa-solver --mining --use <id>"
         create = asyncio.create_subprocess_exec(
-                self.solver_binary, '--mining', '--use', devid.split('.')[0],
+                self.solver_binary, '--mining', '--use', devid.split('.')[0], '-t', str(threads),
                 stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT)
         try:
@@ -332,6 +334,8 @@ class Silentarmy:
 
         if sys.platform == 'win32':
             encoding = 'utf8'
+            psutil.Process(proc.pid).nice(psutil.ABOVE_NORMAL_PRIORITY_CLASS)
+            psutil.Process().nice(psutil.HIGH_PRIORITY_CLASS)
         else:
             encoding = 'ascii'
 					   
@@ -391,7 +395,7 @@ class Silentarmy:
                 if devid not in self.solver_procs:
                     # happens if solver crashed
                     print('Solver %s: not running, relaunching it' % devid)
-                    my_ensure_future(self.start_solvers(devid))
+                    my_ensure_future(self.start_solvers(devid, self.opts.threads))
                     # TODO: ideally the mining job should be sent to the solver
                     # as soon as it is back up and running
         if not self.st_had_job:
@@ -573,11 +577,17 @@ def main():
         defaultInstances = 1
     else:
         defaultInstances = 2
+    defaultThreads = 1
     parser.add_option(
             "--instances",
             dest="instances", action="store", type="int", metavar="N",
             default=defaultInstances,
-            help="run N instances of Equihash per GPU (default: %d)" % (defaultInstances))
+            help="run N instances of sa-solver per GPU (default: %d)" % (defaultInstances))
+    parser.add_option(
+            "--threads",
+            dest="threads", action="store", type="int", metavar="N",
+            default=defaultThreads,
+            help="run N threads per instance of Equihash (default: %d)" % (defaultThreads))
     parser.add_option(
             "-c", "--connect",
             dest="pool", action="store", type="string", metavar="POOL",
@@ -605,6 +615,8 @@ def main():
         fatal("Invalid syntax for --use: %s" % opts.use)
     if opts.instances < 1:
         fatal("The number of instances per GPU should be 1 or greater")
+    if opts.threads < 1:
+        fatal("The number of threads per instance should be 1 or greater")
     Silentarmy(opts).run()
 
 if __name__ == "__main__":

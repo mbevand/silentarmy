@@ -1,4 +1,3 @@
-/windows/x64
 /sa-solver.pdb
 /sa-solver.v12.suo
 /sa-solver.exp
@@ -13,3 +12,22 @@ _temp_*
 *.tmp
 *.pyc
 tags
+sa-solver.iobj
+sa-solver.ipdb
+sa-solver.exe
+windows/x64
+windows/silentarmy.VC.db
+windows/silentarmy.VC.VC.opendb
+windows/dist
+windows/build
+windows/Program.spec
+windows/silentarmy.spec
+windows/.vs/silentarmy/v14/.suo
+windows-nvidia/x64
+windows-nvidia/silentarmy.VC.db
+windows-nvidia/silentarmy.VC.VC.opendb
+windows-nvidia/dist
+windows-nvidia/build
+windows-nvidia/Program.spec
+windows-nvidia/silentarmy.spec
+windows-nvidia/.vs/silentarmy/v14/.suo

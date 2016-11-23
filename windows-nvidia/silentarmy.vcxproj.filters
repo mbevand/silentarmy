@@ -32,9 +32,6 @@
     <ClInclude Include="..\blake.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\param.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="gettimeofday.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -49,9 +46,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\input.cl">
-      <Filter>Resource Files</Filter>
-    </None>
     <None Include="..\silentarmy.py">
       <Filter>Resource Files</Filter>
     </None>
