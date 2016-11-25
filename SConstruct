@@ -74,7 +74,6 @@ if GetOption('enable_win_cross_build'):
         'CC': '${CROSS_PREFIX}gcc',
         'CPP': '${CROSS_PREFIX}cpp',
         'CXX': '${CROSS_PREFIX}g++',
-        'LD': '${CROSS_PREFIX}${SMARTLINK}',
         'RANLIB': '${CROSS_PREFIX}ranlib',
         'SHLIBSUFFIX': '.dll',
         'LIBPREFIX': '',
