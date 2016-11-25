@@ -6,8 +6,6 @@
 MIT license
 """
 from cffi import FFI
-import os.path
-import inspect
 import pkg_resources
 import platform
 import pysa
