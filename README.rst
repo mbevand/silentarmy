@@ -3,7 +3,7 @@ Local Development Build (Linux)
 
 * optionally, enable python virtualenv::
    . .zcashvenv3/bin/activate
-* development installation in case of OpenCL present in system pathf::
+* development installation in case of OpenCL present in system path::
    pip install -e .
 * development installation with local OpenCL headers and library
   (adjust library/header path and name depending on the version
