@@ -231,6 +231,7 @@ void load_file(const char *fname, char **dat, size_t *dat_len)
     if (close(fd))
 	fatal("close: %s: %s\n", fname, strerror(errno));
     (*dat)[*dat_len] = 0;
+    free(dat);
 }
 
 void get_program_build_log(cl_program program, cl_device_id device)
@@ -287,6 +288,7 @@ void get_program_bins(cl_program program)
 	fatal("clGetProgramInfo (%d)\n", status);
     dump("dump.co", p, sizes);
     debug("program: %02x%02x%02x%02x...\n", p[0], p[1], p[2], p[3]);
+    free(p);
 }
 
 void print_platform_info(cl_platform_id plat)
@@ -1174,6 +1176,8 @@ void run_opencl(uint8_t *header, size_t header_len, cl_context ctx,
     clReleaseMemObject(buf_sols);
     clReleaseMemObject(buf_ht[0]);
     clReleaseMemObject(buf_ht[1]);
+    clReleaseMemObject(rowCounters[0]);
+    clReleaseMemObject(rowCounters[1]);
 }
 
 /*
@@ -1262,10 +1266,10 @@ void scan_platforms(cl_platform_id *plat_id, cl_device_id *dev_id)
 	    break ;
 	i++;
       }
+    free(platforms);
     if (do_list_devices)
 	exit(0);
     debug("Using GPU device ID %d\n", gpu_to_use);
-    free(platforms);
 }
 
 void init_and_run_opencl(uint8_t *header, size_t header_len)
