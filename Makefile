@@ -22,9 +22,9 @@ sa-solver : ${OBJ}
 ${OBJ} : ${INCLUDES}
 
 _kernel.h : input.cl param.h
-	echo 'const char *ocl_code = R"_mrb_(' >$@
-	cpp $< >>$@
-	echo ')_mrb_";' >>$@
+	cpp $< ocl.code
+	printf "\x00" >> ocl.code
+	xxd -i ocl.code $@
 
 test : sa-solver
 	@echo Testing...
@@ -38,6 +38,6 @@ test : sa-solver
 #	different: testing/sols-100
 
 clean :
-	rm -f sa-solver _kernel.h *.o _temp_*
+	rm -f sa-solver _kernel.h *.o _temp_* ocl.code
 
 re : clean all

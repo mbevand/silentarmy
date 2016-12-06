@@ -1277,8 +1277,8 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
     cl_program program;
     const char *source;
     size_t source_len;
-    source = ocl_code;
-    source_len = strlen(ocl_code);
+    source = (char *)ocl_code;
+    source_len = ocl_code_len - 1;
     program = clCreateProgramWithSource(context, 1, (const char **)&source,
 	    &source_len, &status);
     if (status != CL_SUCCESS || !program)
