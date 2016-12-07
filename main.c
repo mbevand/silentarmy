@@ -495,8 +495,12 @@ void examine_dbg(cl_command_queue queue, cl_mem buf_dbg, size_t dbg_size)
     free(dbg);
 }
 
+size_t selected_work_size_blake;
 size_t select_work_size_blake(void)
 {
+    if (selected_work_size_blake)
+        return selected_work_size_blake;
+
     size_t              work_size =
         64 * /* thread per wavefront */
         BLAKE_WPS * /* wavefront per simd */
@@ -508,6 +512,7 @@ size_t select_work_size_blake(void)
     while (NR_INPUTS % work_size)
         work_size += 64;
     //debug("Blake: work size %zd\n", work_size);
+    selected_work_size_blake = work_size;
     return work_size;
 }
 
