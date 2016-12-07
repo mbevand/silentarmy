@@ -31,6 +31,7 @@ uint32_t	show_encoded = 0;
 uint64_t	nr_nonces = 1;
 uint32_t	do_list_devices = 0;
 uint32_t	gpu_to_use = 0;
+cl_device_id    gpu_device_id = 0;
 uint32_t	mining = 0;
 double		kern_avg_run_time = 0;
 
@@ -204,11 +205,16 @@ uint8_t hex2val(const char *base, size_t off)
     return 0;
 }
 
-unsigned nr_compute_units(const char *gpu)
+cl_uint get_device_max_compute_units(void)
 {
-    if (!strcmp(gpu, "rx480")) return 36;
-    fprintf(stderr, "Unknown GPU: %s\n", gpu);
-    return 0;
+    cl_uint compute_units;
+    size_t len = 0;
+    int status;
+
+    status = clGetDeviceInfo(gpu_device_id, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof (compute_units), &compute_units, &len);
+    if (status != CL_SUCCESS)
+        fatal("clGetDeviceInfo (%d)\n", status);
+    return compute_units;
 }
 
 void load_file(const char *fname, char **dat, size_t *dat_len)
@@ -495,7 +501,7 @@ size_t select_work_size_blake(void)
         64 * /* thread per wavefront */
         BLAKE_WPS * /* wavefront per simd */
         4 * /* simd per compute unit */
-        nr_compute_units("rx480");
+        get_device_max_compute_units();
     // Make the work group size a multiple of the nr of wavefronts, while
     // dividing the number of inputs. This results in the worksize being a
     // power of 2.
@@ -1219,7 +1225,7 @@ unsigned scan_platform(cl_platform_id plat, cl_uint *nr_devs_total,
 	  {
 	    found = 1;
 	    *plat_id = plat;
-	    *dev_id = devices[i];
+	    *dev_id = gpu_device_id = devices[i];
 	    break ;
 	  }
 	(*nr_devs_total)++;
