@@ -211,28 +211,6 @@ unsigned nr_compute_units(const char *gpu)
     return 0;
 }
 
-void load_file(const char *fname, char **dat, size_t *dat_len)
-{
-    struct stat	st;
-    int		fd;
-    ssize_t	ret;
-    if (-1 == (fd = open(fname, O_RDONLY)))
-	fatal("%s: %s\n", fname, strerror(errno));
-    if (fstat(fd, &st))
-	fatal("fstat: %s: %s\n", fname, strerror(errno));
-    *dat_len = st.st_size;
-    if (!(*dat = (char *)malloc(*dat_len + 1)))
-	fatal("malloc: %s\n", strerror(errno));
-    ret = read(fd, *dat, *dat_len);
-    if (ret < 0)
-	fatal("read: %s: %s\n", fname, strerror(errno));
-    if ((size_t)ret != *dat_len)
-	fatal("%s: partial read\n", fname);
-    if (close(fd))
-	fatal("close: %s: %s\n", fname, strerror(errno));
-    (*dat)[*dat_len] = 0;
-}
-
 void get_program_build_log(cl_program program, cl_device_id device)
 {
     cl_int		status;
@@ -287,6 +265,7 @@ void get_program_bins(cl_program program)
 	fatal("clGetProgramInfo (%d)\n", status);
     dump("dump.co", p, sizes);
     debug("program: %02x%02x%02x%02x...\n", p[0], p[1], p[2], p[3]);
+    free(p);
 }
 
 void print_platform_info(cl_platform_id plat)
@@ -1174,6 +1153,8 @@ void run_opencl(uint8_t *header, size_t header_len, cl_context ctx,
     clReleaseMemObject(buf_sols);
     clReleaseMemObject(buf_ht[0]);
     clReleaseMemObject(buf_ht[1]);
+    clReleaseMemObject(rowCounters[0]);
+    clReleaseMemObject(rowCounters[1]);
 }
 
 /*
@@ -1296,7 +1277,6 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
     cl_program program;
     const char *source;
     size_t source_len;
-    //load_file("kernel.cl", &source, &source_len);
     source = ocl_code;
     source_len = strlen(ocl_code);
     program = clCreateProgramWithSource(context, 1, (const char **)&source,

@@ -271,6 +271,7 @@ Donations welcome: t1cVviFvgJinQ4w3C2m2CfRxgP5DnHYaoFC
 I would like to thank these persons for their contributions to SILENTARMY,
 in alphabetical order:
 * eXtremal
+* jramos
 * kenshirothefist
 * Kubuxu
 * lhl

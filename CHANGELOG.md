@@ -5,6 +5,8 @@
   (nerdralph). 'make test' finds 196 sols again
 * Implement mining.extranonce.subscribe (kenshirothefist)
 * mining.authorize sends an empty string if no password is specified
+* Fix memory leaks
+* Avoid fatal error when OpenCL platform returns CL_DEVICE_NOT_FOUND
 
 # Version 5 (11 Nov 2016)
 
