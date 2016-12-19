@@ -48,17 +48,22 @@ Options:
                         use the first three: 0,1,2 (default: 0)
   --instances=N         run N instances of Equihash per GPU (default: 2)
   -c POOL, --connect=POOL
-                        connect to POOL, for example:
-                        stratum+tcp://example.com:1234
+                        connect to POOL, for example
+                        stratum+tcp://example.com:1234 (add "#xnsub" to enable
+                        extranonce.subscribe)
   -u USER, --user=USER  username for connecting to the pool
   -p PWD, --pwd=PWD     password for connecting to the pool
 ```
 
 # Performance
 
-* 115 sol/s with one R9 Nano
-* 75 sol/s with one RX 480 8GB
-* 70 sol/s with one GTX 1070
+| Vendor | Type | Model      | sol/s |
+|--------|------|------------|-------|
+| AMD    | GPU  | R9 Nano    | 115   |
+| AMD    | GPU  | R9 390X    | 100   |
+| AMD    | GPU  | R9 390     | 95    |
+| AMD    | GPU  | RX 480 8GB | 75    |
+| NVIDIA | GPU  | GTX 1070   | 70    |
 
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md#performance) to resolve performance
 issues.
@@ -82,10 +87,10 @@ subsection below:
 ### Ubuntu 16.04 / amdgpu
 
 1. Download the [AMDGPU-PRO Driver](http://support.amd.com/en-us/kb-articles/Pages/AMDGPU-PRO-Install.aspx)
-(as of 30 Oct 2016, the latest version is 16.40).
+(as of 12 Dec 2016, the latest version is 16.50).
 
 2. Extract it:
-   `$ tar xf amdgpu-pro-16.40-348864.tar.xz`
+   `$ tar xf amdgpu-pro-16.50-362463.tar.xz`
 
 3. Install (non-root, will use sudo access automatically):
    `$ ./amdgpu-pro-install`
