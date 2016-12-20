@@ -1202,12 +1202,7 @@ unsigned scan_platform(cl_platform_id plat, cl_uint *nr_devs_total,
     if (do_list_devices)
 	print_platform_info(plat);
     status = clGetDeviceIDs(plat, typ, 0, NULL, &nr_devs);
-    // With multiple platforms, valid devices may not be on current platform
-    if (status == CL_DEVICE_NOT_FOUND){
-	debug("Device not found: clGetDeviceIDs (%d)\n", status);
-	return 0;
-    }
-    else if (status != CL_SUCCESS)
+    if (status != CL_SUCCESS)
 	fatal("clGetDeviceIDs (%d)\n", status);
     if (nr_devs == 0)
 	return 0;
