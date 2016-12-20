@@ -46,6 +46,12 @@ def get_target_system_shared_library_name():
      return pysa.get_library_filename(target_system_name)
 
 class MyDist(Distribution):
+     """Override distribution - indicate presense of ext modules.
+
+     Since the backend library is being built by scons, we cannot use
+     the 'ext' modules functionality. However, we always want the
+     binary package to have a platform specific suffic.
+     """
      def has_ext_modules(self):
          return True
 
@@ -97,6 +103,10 @@ def sconsbuild(command_subclass):
     return command_subclass
 
 
+# Override the following commands to cover all scenarios when the
+# package is being built/installed so that the build of the C backend
+# is always triggered at most once. A drawback is that all 3 commands
+# now accept the '--scons-opts' option
 @sconsbuild
 class BuildCommand(build):
      pass
@@ -171,7 +181,6 @@ setup(
      # your project is installed. For an analysis of "install_requires" vs pip's
      # requirements files see:
      # https://packaging.python.org/en/latest/requirements.html
-     # mako is suggested by pyopencl
      install_requires=['cffi'],
 
      package_data={
