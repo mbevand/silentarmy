@@ -125,6 +125,14 @@ subsection below:
 
 2. Either reboot, or load the kernel driver:
    `$ sudo modprobe nvidia_361`
+   
+### Ubuntu 16.04 / Intel
+
+1. Install the OpenCL headers and library:
+    `$ sudo apt-get install beignet-opencl-icd`
+    
+2. You must either alter the Makefile below or build silentarmy using
+    ` make OPENCL_HEADERS=/usr/lib/x86_64-linux-gnu/beignet/include/ LIBOPENCL=/usr/lib/x86_64-linux-gnu/beignet/ LDLIBS="-lcl -lrt"`
 
 ## Step 2: Python 3.3
 
