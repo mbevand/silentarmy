@@ -57,13 +57,14 @@ Options:
 
 # Performance
 
-| Vendor | Type | Model      | sol/s |
-|--------|------|------------|-------|
-| AMD    | GPU  | R9 Nano    | 115   |
-| AMD    | GPU  | R9 390X    | 100   |
-| AMD    | GPU  | R9 390     | 95    |
-| AMD    | GPU  | RX 480 8GB | 75    |
-| NVIDIA | GPU  | GTX 1070   | 70    |
+| Vendor | Type | Model        | sol/s |
+|--------|------|--------------|-------|
+| AMD    | GPU  | R9 Nano      | 115   |
+| AMD    | GPU  | R9 390X      | 100   |
+| AMD    | GPU  | R9 390       | 95    |
+| AMD    | GPU  | RX 480 8GB   | 75    |
+| NVIDIA | GPU  | GTX 1070     | 70    |
+| AMD    | GPU  | FirePro D300 | 21    |
 
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md#performance) to resolve performance
 issues.
