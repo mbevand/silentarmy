@@ -1,3 +1,5 @@
+**This project is currently no longer maintained as of 2017-12-03. -Marc**
+
 # SILENTARMY
 
 Official site: https://github.com/mbevand/silentarmy
