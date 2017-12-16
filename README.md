@@ -102,7 +102,7 @@ subsection below:
 
 5. Reboot
 
-6. Download the [AMD APP SDK](http://developer.amd.com/tools-and-sdks/opencl-zone/amd-accelerated-parallel-processing-app-sdk/)
+6. Download the [AMD APP SDK](https://developer.amd.com/amd-accelerated-parallel-processing-app-sdk/)
 (as of 27 Oct 2016, the latest version is 3.0)
 
 7. Extract it:
