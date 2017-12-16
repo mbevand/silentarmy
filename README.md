@@ -110,6 +110,9 @@ subsection below:
 
 8. Install system-wide by running as root (accept all the default options):
    `$ sudo ./AMD-APP-SDK-v3.0.130.136-GA-linux64.sh`
+   
+9. Install ocl opencl development to make ld able to link OpenCL
+   `$ sudo apt install ocl-icd-opencl-dev`
 
 ### Ubuntu 14.04 / fglrx
 
