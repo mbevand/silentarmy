@@ -20,6 +20,15 @@ except ImportError as e:
     sys.path.insert(1, p) # make it the 2nd path
     import asyncio
 
+try:
+    import socks
+except ImportError as e:
+    # system doesn't provide socks module (eg. Python 3.3),
+    # so use module bundled with silentarmy
+    ps = os.path.join(sys.path[0], 'thirdparty', 'PySocks')
+    sys.path.insert(2, ps) # make PySocks the 3rd path
+    import socks
+
 verbose_level = 0
 
 def b2hex(b):
@@ -198,7 +207,17 @@ class Silentarmy:
             info = " (attempt %d)" % self.st_conn_attempt
         print("Connecting to %s:%d%s" % (self.host, self.port, info))
         self.st_state = 'CONNECTING'
-        coro = self.loop.create_connection(lambda: self.st_protocol,
+        if self.opts.proxy:
+            # Setup socks proxy using PySocks
+            proxy = self.opts.proxy.split(':')
+            s = socks.socksocket()
+            s.set_proxy(socks.SOCKS5, proxy[0], int(proxy[1]))
+            s.connect((self.host, self.port))
+            # Connect to pool using the connected socks socket
+            coro = self.loop.create_connection(lambda: self.st_protocol,
+                sock=s)
+        else:
+            coro = self.loop.create_connection(lambda: self.st_protocol,
                 self.host, self.port)
         try:
             (self.st_transport, _) = yield from coro
@@ -584,6 +603,11 @@ def main():
             "-p", "--pwd",
             dest="pwd", action="store", type="string", metavar="PWD",
             help="password for connecting to the pool")
+    parser.add_option(
+            "-x", "--proxy",
+            dest="proxy", action="store", type="string", metavar="PXY",
+            help="use a socks proxy to connect to the pool" +
+            "example: \"127.0.0.1:9050\"")
     (opts, args) = parser.parse_args()
     if args:
         parser.error("Extraneous arguments found on command line")
