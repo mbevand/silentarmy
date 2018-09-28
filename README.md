@@ -1,10 +1,8 @@
-**This project is currently no longer maintained as of 2017-12-03. -Marc**
+# SILENTARMY verus coin by monkins1010
 
-# SILENTARMY
 
-Official site: https://github.com/mbevand/silentarmy
 
-SILENTARMY is a free open source [Zcash](https://z.cash) miner for Linux
+SILENTARMY Veruscoin is a free open source Opencl Veruscoin www.veruscoin.io  miner for Linux
 with multi-GPU and [Stratum](https://github.com/str4d/zips/blob/77-zip-stratum/drafts/str4d-stratum/draft1.rst) support. It is written in OpenCL and has been tested
 on AMD/Nvidia/Intel GPUs, Xeon Phi, and more.
 
@@ -14,18 +12,18 @@ After compiling SILENTARMY, list the available OpenCL devices:
 $ silentarmy --list
 ```
 
-Start mining with two GPUs (ID 2 and ID 5) on a pool:
+Start mining with three GPUs (ID 0,1,2) on a pool:
 
 ```
-$ silentarmy --use 2,5 -c stratum+tcp://us1-zcash.flypool.org:3333 -u t1cVviFvgJinQ4w3C2m2CfRxgP5DnHYaoFC
+$ silentarmy --use 0,1,3 -c stratum+tcp://stratum.veruspool.xyz:9999 -u REoPcdGXthL5yeTCrJtrQv5xhYTknbFbec.monkins
 ```
 
 When run without options, SILENTARMY mines with the first OpenCL device, using
-my donation address, on flypool:
+my donation address, on veruspool:
 
 ```
 $ silentarmy
-Connecting to us1-zcash.flypool.org:3333
+Connecting to stratum.veruspool.xyz:9999
 Stratum server sent us the first job
 Mining on 1 device
 Total 0.0 sol/s [dev0 0.0] 0 shares
