@@ -80,7 +80,7 @@ __kernel void kernel_verushash(__global uchar *midstate, __global uint *output, 
 { 
     //printf("horsemeat salad");
 	__private uint gid = get_global_id(0);
-    //    __private uint lid = get_local_id(0);   //needed if worksize is reduced
+        __private uint lid = get_local_id(0);  
 	__private unsigned char s[64] , tmp[32];
         __local uchar sharedMemory1[256];   //sharemem fastest
 	__private uchar in[64];
