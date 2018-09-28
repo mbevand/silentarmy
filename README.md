@@ -3,8 +3,7 @@
 Written for the community BTC donations to Monkins1010 3HNYjR3FoVLpnZsjTNnPc51kt8g6gu3YfJ if you are so inclined :-)
 
 SILENTARMY Veruscoin is a free open source Opencl Veruscoin www.veruscoin.io  miner for Linux
-with multi-GPU and [Stratum](https://github.com/str4d/zips/blob/77-zip-stratum/drafts/str4d-stratum/draft1.rst) support. It is written in OpenCL and has been tested
-on AMD/Nvidia/Intel GPUs, Xeon Phi, and more.
+with multi-GPU and [Stratum](https://github.com/str4d/zips/blob/77-zip-stratum/drafts/str4d-stratum/draft1.rst) support. It is written in OpenCL and is designed to run on AMD/Nvidia/Intel GPUs, Xeon Phi, and more.
 
 After compiling SILENTARMY, list the available OpenCL devices:
 
