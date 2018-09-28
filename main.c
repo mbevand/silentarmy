@@ -27,7 +27,7 @@ typedef uint32_t	uint;
 #define MIN(A, B)	(((A) < (B)) ? (A) : (B))
 #define MAX(A, B)	(((A) > (B)) ? (A) : (B))
 
-int		verbose = 0;
+int		verbose = 1;
 uint32_t	show_encoded = 0;
 uint64_t	nr_nonces = 1;
 uint32_t	do_list_devices = 0;
@@ -149,7 +149,7 @@ void check_clSetKernelArg(cl_kernel k, cl_uint a_pos, cl_mem *a)
     cl_int	status;
     status = clSetKernelArg(k, a_pos, sizeof (*a), a);
     if (status != CL_SUCCESS)
-	fatal("clSetKernelArg (%d)\n", status);
+	debug("clSetKernelArg (%d)\n", status);
 }
 
 void check_clEnqueueNDRangeKernel(cl_command_queue queue, cl_kernel k, cl_uint
@@ -163,7 +163,7 @@ void check_clEnqueueNDRangeKernel(cl_command_queue queue, cl_kernel k, cl_uint
 	    global_work_size, local_work_size, num_events_in_wait_list,
 	    event_wait_list, event);
     if (status != CL_SUCCESS)
-	    fatal("clEnqueueNDRangeKernel (%d)\n", status);
+	    fatal("clEnqueueNDRangeKernel crapped out(%d)\n", status);
 }
 
 void check_clEnqueueReadBuffer(cl_command_queue queue, cl_mem buffer, cl_bool
@@ -489,8 +489,9 @@ void examine_dbg(cl_command_queue queue, cl_mem buf_dbg, size_t dbg_size)
             dropped_coll_total, dropped_stor_total);
     free(dbg);
 }
-void VerusHashHalf(blake2b_state_t *st, const void *data, size_t len)
-{   unsigned char full_data[140+3+1344] = { 0 };
+void VerusHashHalf(uchar *st, const void *data, size_t len)
+{   
+    unsigned char full_data[140+3+1344] = { 0 };
     unsigned char block_41970[] = {0xfd, 0x40, 0x05};
     memcpy(full_data, data, 140);
     memcpy(full_data + 140, block_41970, 3);
@@ -500,7 +501,7 @@ void VerusHashHalf(blake2b_state_t *st, const void *data, size_t len)
     unsigned char *bufPtr2 = bufPtr + nextOffset;
     unsigned char *ptr = (unsigned char *)full_data;
     uint32_t count = 0;
-
+//hexdump(full_data,1487);
     // put our last result or zero at beginning of buffer each time
    memset(bufPtr, 0, 32);
 
@@ -531,8 +532,8 @@ void VerusHashHalf(blake2b_state_t *st, const void *data, size_t len)
 
         nextOffset *= -1;
     }
-    memcpy(st->h, bufPtr, 32);
-};
+    memcpy(st, bufPtr, 32);
+}
 size_t select_work_size_blake(void)
 {
     size_t              work_size =
@@ -837,84 +838,61 @@ uint32_t verify_sol(sols_t *sols, unsigned sol_i)
 /*
 ** Return the number of valid solutions.
 */
-uint32_t verify_nonce(cl_command_queue queue, cl_mem nonces, uint64_t *nonce,
+uint32_t verify_nonce(cl_command_queue queue, cl_mem nonces_d, uint64_t *nonce,
 	uint8_t *header, size_t fixed_nonce_bytes, uint8_t *target,
-	char *job_id, uint32_t *shares, struct timespec *target_time,blake2b_state_t verus)
+	char *job_id, uint32_t *shares, struct timespec *target_time,uchar *verus, uint32_t **pnonce)
 {
-    uint8_t	buffer[ZCASH_BLOCK_HEADER_LEN + ZCASH_SOLSIZE_LEN +
-	ZCASH_SOL_LEN] = { 0 };
+    uint8_t	buffer[1347] = { 0 };
     unsigned char	*p;
-    uint32_t	*pnonce;
-    pnonce = (uint32_t*)malloc(sizeof(*pnonce));
-    uint32_t	nr_valid_sols;
-    uint32_t    blockhash_half[64];
+    uint32_t	sh = 0;
+    uint8_t    blockhash_half[64];
+    uint32_t    winning_n;
+    uchar verus_copy[32];
     
-    if (!pnonce)
-	fatal("malloc: %s\n", strerror(errno));
-    // Most OpenCL implementations of clEnqueueReadBuffer in blocking mode are
-    // good, except Nvidia implementing it as a wasteful busywait, so let's
-    // work around it by trying to sleep just a bit less than the expected
-    // amount of time.
-    cl_event readEvent;
-    check_clEnqueueReadBuffer(queue, nonces,
-	    CL_FALSE,	// cl_bool	blocking_read
+    for(int i =0; i< 32;i++)
+        verus_copy[i] = verus[i];
+    //uint32_t    *in;
+    //in = (uint32_t*)malloc(sizeof(uint32_t)*8);
+     // clFinish(queue);
+    check_clEnqueueReadBuffer(queue, nonces_d,
+	    CL_TRUE,	// cl_bool	blocking_read
 	    0,		// size_t	offset
-	    sizeof (uint32_t),	// size_t	size
+	    sizeof (uint32_t) * 8,	// size_t	size
 	    pnonce,	// void		*ptr
 	    0,		// cl_uint	num_events_in_wait_list
 	    NULL,	// cl_event	*event_wait_list
-	    &readEvent);	// cl_event	*event
-    // flushing is crucial to initiate the read *now* before sleeping
-    clFlush(queue);
-    struct timespec start_time;
-    get_time(&start_time);
-    double dtarget = timespec_to_double(target_time);
-    cl_int readStatus;
-    clGetEventInfo(readEvent, CL_EVENT_COMMAND_EXECUTION_STATUS,
-	    sizeof (cl_int), &readStatus, NULL);
-    while (readStatus != CL_COMPLETE && SLEEP_SKIP_RATIO != 1)
-      {
-	struct timespec t;
-	get_time(&t);
-	double dt = timespec_to_double(&t);
-	double delta = dtarget - dt;
-	if (delta < 0)
-	    break;
-	double_to_timespec(delta * SLEEP_RECHECK_RATIO, &t);
-	nanosleep(&t, NULL);
-	clGetEventInfo(readEvent, CL_EVENT_COMMAND_EXECUTION_STATUS,
-		sizeof (cl_int), &readStatus, NULL);
-      }
-    clWaitForEvents(1, &readEvent);
-    struct timespec end_time;
-    get_time(&end_time);
-    double dstart, dend, delta;
-    dstart = timespec_to_double(&start_time);
-    dend = timespec_to_double(&end_time);
-    delta = dend - dstart;
-    kern_avg_run_time = kern_avg_run_time * 6.0 / 10.0 + delta * (4.0 / 10.0);
-    kern_avg_run_time *= (1 - (double)SLEEP_SKIP_RATIO);
-    // let's check these solutions we just read...
-    //if (pnonce > MAX_SOLS)
-     // {
-	//fprintf(stderr, "%d (probably invalid) solutions were dropped!\n",
-//		sols->nr - MAX_SOLS);
-//	sols->nr = MAX_SOLS;
-  //    }
-    //debug("Retrieved %d potential solutions\n", sols->nr);
-    nr_valid_sols = 0;
-    if (pnonce != UINT32_MAX )
-    {
-    memcpy(blockhash_half, verus.h,64);
+	    NULL);	// cl_event	*event
+  
+     
+
+    winning_n = pnonce[0];
+     
+   // printf("(nonce=%08x,%08x,%08x)", pnonce[0], pnonce[1],pnonce[7]);
+    
+    if (winning_n != 0xffffffffu)
+    { ///printf("(cpu nonce=%08x)",winning_n);
+    
+    memcpy(blockhash_half, &verus_copy,64);
     memset(blockhash_half + 32, 0x0, 32);
-    memcpy(blockhash_half + 32, pnonce, 15);
-    const uint32_t Htarg = target[7];
+    memcpy(blockhash_half + 32, &winning_n, 4);
+    const uint32_t Htarg = ((uint32_t*)&target[0])[7];
     uint32_t vhash[8];
+    
+   // printf("cpu string in= ");
+   // for(int i = 0;i<36;i++)
+   // printf("%02x",blockhash_half[i]);
+    // printf("\n");
     haraka512_port_zero((unsigned char*)vhash, (unsigned char*)blockhash_half);
-    if (vhash[7] <= Htarg && fulltest(vhash, target))
-        memcpy(buffer + 1332,pnonce,8);
+   // printf("CPU resulthash= ");
+   // for(int i = 0;i<32;i++)
+    ///printf("%02x",((uint8_t*)&vhash[0])[i]);
+   // printf("\n");
+   // hexdump(vhash,32);
+    if (vhash[7] <= Htarg && fulltest(vhash, (uint32_t*)target))
+    {  //printf("(nonce=%08x)",winning_n);
+        ((uint32_t*)&buffer)[333] = winning_n;
         buffer[0] = 0xfd; buffer[1] = 0x40; buffer[2] = 0x05;
-        nr_valid_sols = 1;
+        sh = 1;
         
     debug("Hash is under target\n");
     printf("sol: %s ", job_id);
@@ -922,26 +900,18 @@ uint32_t verify_nonce(cl_command_queue queue, cl_mem nonces, uint64_t *nonce,
     printf("%02x%02x%02x%02x ", p[0], p[1], p[2], p[3]);
     printf("%s ", s_hexdump(header + ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN +
 		fixed_nonce_bytes, ZCASH_NONCE_LEN - fixed_nonce_bytes));
-    printf("%s%s\n", ZCASH_SOLSIZE_HEX,
-	    s_hexdump(buffer + ZCASH_BLOCK_HEADER_LEN + ZCASH_SOLSIZE_LEN,
-		ZCASH_SOL_LEN));
+    printf("%s\n",s_hexdump(buffer,1347));
     fflush(stdout);
-    //for (unsigned sol_i = 0; sol_i < sols->nr; sol_i++)
-//	nr_valid_sols += verify_sol(sols, sol_i);
-    
-    //uint32_t sh = print_sols(sols, nonce, nr_valid_sols, header,
-	//    fixed_nonce_bytes, target, job_id);
     }
-    //if (shares)
-	//*shares = sh;  ///***NOT SURE MAY HAVE TO CHECK ***
-    if (!mining || verbose)
-	fprintf(stderr, "Nonce %s: %d sol%s\n",
-		s_hexdump(nonce, ZCASH_NONCE_LEN), nr_valid_sols,
-		nr_valid_sols == 1 ? "" : "s");
-    //debug("Stats: %d likely invalids\n", sols->likely_invalids);
-    
-    free(pnonce);
-    return nr_valid_sols;
+	
+    }
+   // free(in);   
+
+     if (shares)
+	*shares = sh;  ///***NOT SURE MAY HAVE TO CHECK ***
+
+    return sh;
+
 }
 
 unsigned get_value(unsigned *data, unsigned row)
@@ -962,30 +932,40 @@ unsigned get_value(unsigned *data, unsigned row)
 **
 ** Return the number of solutions found.
 */
-uint32_t solve_verushash(cl_context ctx, cl_command_queue queue,
-	cl_kernel k_init_ht, cl_kernel *k_rounds, cl_kernel k_sols,
-	cl_mem *buf_ht, cl_mem buf_sols, cl_mem buf_dbg, size_t dbg_size,
+uint32_t solve_verushash(cl_context ctx, cl_command_queue queue, 
+             cl_kernel k_verus,
 	uint8_t *header, size_t header_len, char do_increment,
 	size_t fixed_nonce_bytes, uint8_t *target, char *job_id,
-	uint32_t *shares, cl_mem *rowCounters)
+	uint32_t *shares)
 {
-    blake2b_state_t     blake;
-    blake2b_state_t     verus;
-    cl_mem              buf_verus_st, target_d, nonces;
+    //blake2b_state_t     blake;
+    uint8_t              *pverus;
+    uint8_t             *ptarget;
+    uint32_t		*pnonces, *pcounter;
+    cl_mem              verushash_d, target_d, nonces_d, counter_d;
     size_t		global_ws;
     size_t              local_work_size = 256;
-    uint32_t		nonces_found = 0xFFFFFFFF;
+    
     uint32_t		nonces_total = 0;
     uint64_t		*nonce_ptr;
-    uint8_t             target_copy[32];
+   
+    pverus  = (uint8_t*)malloc(sizeof(uint8_t)* 64);
+    ptarget = (uint8_t *)malloc(sizeof(uint8_t) * 32);
+    pnonces = (uint32_t *)malloc(sizeof(uint32_t)*8);
+    pcounter = (uint32_t *)malloc(sizeof(uint32_t));
     
-    memcpy(target_copy,target,32);  //we need to send the target to the kernel
-    
-    assert(header_len == ZCASH_BLOCK_HEADER_LEN);
+   for (int i = 0; i < 32; i++)
+        ptarget[i]=target[i];  
+   // printf("(target %s)",s_hexdump(target,32));
+    //we need to send the target to the kernel
+    pnonces[0]=0xffffffff;
+    pcounter[0]=0x0;
+        
     if (mining)
 	assert(target && job_id);
     nonce_ptr = (uint64_t *)(header + ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN);
-    if (do_increment)
+    
+     if (do_increment)
       {
 	// Increment the nonce
 	if (mining)
@@ -999,33 +979,31 @@ uint32_t solve_verushash(cl_context ctx, cl_command_queue queue,
 	    // increment bytes 0-7
 	    (*nonce_ptr)++;
       }
-    debug("\nHashing Verus nonce %s\n", s_hexdump(nonce_ptr, ZCASH_NONCE_LEN));
-    // Process first BLAKE2b-400 block
-    VerusHashHalf(&verus, header, 1487);
-    //zcash_blake2b_init(&blake, ZCASH_HASH_LEN, PARAM_N, PARAM_K);
-    //zcash_blake2b_update(&blake, header, 128, 0);
-    buf_verus_st = check_clCreateBuffer(ctx, CL_MEM_READ_ONLY |
-	    CL_MEM_COPY_HOST_PTR, sizeof (verus.h), &verus.h);
-    target_d = check_clCreateBuffer(ctx, CL_MEM_READ_ONLY |
-	    CL_MEM_COPY_HOST_PTR, sizeof (uint8_t) * 32, &target_copy);
-    nonces = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, 
-                     sizeof (uint32_t), &nonces_found);
+   // debug("\nHashing Verus nonce %s\n", s_hexdump(nonce_ptr, ZCASH_NONCE_LEN));
+   //hexdump(header,140);
+   VerusHashHalf(pverus, header, 1487);
+   //printf("pverus cpu");
+   //hexdump(pverus,8);
+      
+    verushash_d = check_clCreateBuffer(ctx,CL_MEM_READ_WRITE, sizeof (uint8_t) * 64, NULL);
+    target_d = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof (uint8_t) * 32, NULL);
+    nonces_d = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof (uint32_t) * 8, NULL);
+    counter_d = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof (uint32_t), NULL);
     
-    //for (unsigned round = 0; round < PARAM_K; round++) //no rounds needed anymore
-    //  {
-	//init_ht(queue, k_init_ht, buf_ht[0], rowCounters[0]);
-	    check_clSetKernelArg(k_rounds[0], 0, &buf_verus_st);
-	    check_clSetKernelArg(k_rounds[0], 1, &nonces);
-	    check_clSetKernelArg(k_rounds[0], 2, &target_d);
-	    global_ws = 0x00004000;
-	//check_clSetKernelArg(k_rounds[round], round == 0 ? 3 : 4, &buf_dbg);
-	
-	check_clEnqueueNDRangeKernel(queue, k_rounds[0], 1, NULL,
-		&global_ws, &local_work_size, 0, NULL, NULL);
+    clEnqueueWriteBuffer(queue,verushash_d,CL_TRUE,0,sizeof (uint8_t) * 64,pverus,0,NULL,NULL);
+    clEnqueueWriteBuffer(queue,target_d,CL_TRUE,0,sizeof (uint8_t) * 32,ptarget,0,NULL,NULL);
+    clEnqueueWriteBuffer(queue,nonces_d,CL_TRUE,0,sizeof (uint32_t) * 8 ,pnonces,0,NULL,NULL);
+    clEnqueueWriteBuffer(queue,counter_d,CL_TRUE,0,sizeof (uint32_t),pcounter,0,NULL,NULL);
         
-	examine_ht(0, queue, buf_ht[0]);    //doesnothing unless in debug
-	//examine_dbg(queue, buf_dbg, dbg_size);
-     // }
+    check_clSetKernelArg(k_verus, 0, &verushash_d);
+    check_clSetKernelArg(k_verus, 1, &nonces_d);
+    check_clSetKernelArg(k_verus, 2, &target_d);
+    check_clSetKernelArg(k_verus, 3, &counter_d);
+    
+    global_ws = 0x8000000;
+    check_clEnqueueNDRangeKernel(queue, k_verus, 1, NULL,
+            &global_ws, &local_work_size, 0, NULL, NULL);
+    clFinish(queue);    
     
     struct timespec start_time, target_time;
     get_time(&start_time);
@@ -1034,10 +1012,16 @@ uint32_t solve_verushash(cl_context ctx, cl_command_queue queue,
     dtarget = dstart + kern_avg_run_time;
     double_to_timespec(dtarget, &target_time);
     // read solutions
-    
-    nonces_total = verify_nonce(queue, nonces, nonce_ptr, header,
-	    fixed_nonce_bytes, target, job_id, shares, &target_time,verus);
-    clReleaseMemObject(buf_verus_st);
+    nonces_total = verify_nonce(queue, nonces_d, nonce_ptr, header,
+	    fixed_nonce_bytes, target, job_id, shares, &target_time,pverus,pnonces);
+    clReleaseMemObject(verushash_d);
+    clReleaseMemObject(target_d);
+    clReleaseMemObject(nonces_d);
+    clReleaseMemObject(counter_d);
+    free(pverus);
+    free(ptarget);
+    free(pnonces);
+    free(pcounter);
     return nonces_total;
 }
 
@@ -1158,9 +1142,7 @@ void mining_parse_job(char *str, uint8_t *target, size_t target_len,
 ** Run in mining mode.
 */
 void mining_mode(cl_context ctx, cl_command_queue queue,
-	cl_kernel k_init_ht, cl_kernel *k_rounds, cl_kernel k_sols,
-	cl_mem *buf_ht, cl_mem buf_sols, cl_mem buf_dbg, size_t dbg_size,
-	uint8_t *header, cl_mem *rowCounters)
+	 cl_kernel k_verus, uint8_t *header)
 {
     char		line[4096];
     uint8_t		target[SHA256_DIGEST_SIZE];
@@ -1174,16 +1156,18 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
     uint64_t		status_period = 500e3; // time (usec) between statuses
     for (i = 0; ; i++)
       {
-        // iteration #0 always reads a job or else there is nothing to do
+     
         if (read_last_line(line, sizeof (line), !i))
             mining_parse_job(line,
                     target, sizeof (target),
                     job_id, sizeof (job_id),
                     header, ZCASH_BLOCK_HEADER_LEN,
                     &fixed_nonce_bytes);
-        total += solve_verushash(ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
-                buf_sols, buf_dbg, dbg_size, header, ZCASH_BLOCK_HEADER_LEN, 1,
-                fixed_nonce_bytes, target, job_id, &shares, rowCounters);
+      
+   
+       total += solve_verushash(ctx, queue, k_verus, header, ZCASH_BLOCK_HEADER_LEN, 1,
+                fixed_nonce_bytes, target, job_id, &shares);
+        
         total_shares += shares;
         if ((t1 = now()) > t0 + status_period)
           {
@@ -1195,56 +1179,29 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
 }
 
 void run_opencl(uint8_t *header, size_t header_len, cl_context ctx,
-        cl_command_queue queue, cl_kernel k_init_ht, cl_kernel *k_rounds,
-	cl_kernel k_sols)
+        cl_command_queue queue, cl_kernel k_verus)
 {
-    cl_mem              buf_ht[2], buf_sols, buf_dbg, rowCounters[2];
-    void                *dbg = NULL;
-#ifdef ENABLE_DEBUG
-    size_t              dbg_size = NR_ROWS * sizeof (debug_t);
-#else
-    size_t              dbg_size = 1 * sizeof (debug_t);
-#endif
+
     uint64_t		nonce;
     uint64_t		total;
     if (!mining || verbose)
 	fprintf(stderr, "Hash tables will use %.1f MB\n", 2.0 * HT_SIZE / 1e6);
     // Set up buffers for the host and memory objects for the kernel
-    if (!(dbg = calloc(dbg_size, 1)))
-	fatal("malloc: %s\n", strerror(errno));
-    //buf_dbg = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE |
-    //	    CL_MEM_COPY_HOST_PTR, dbg_size, dbg);
-    //buf_ht[0] = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, HT_SIZE, NULL);
-    //buf_ht[1] = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, HT_SIZE, NULL);
-    //buf_sols = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof (sols_t), NULL);
-    //rowCounters[0] = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, NR_ROWS, NULL);
-    //rowCounters[1] = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, NR_ROWS, NULL);
-    
-    /// some buffers (above)not needed in the simple verus hash
-    
-    if (mining)
-	mining_mode(ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
-		buf_sols, buf_dbg, dbg_size, header, rowCounters);
+     if (mining)
+	mining_mode(ctx, queue, k_verus, header);
     fprintf(stderr, "Running...\n");
     total = 0;
     uint64_t t0 = now();
     // Solve Equihash for a few nonces
     for (nonce = 0; nonce < nr_nonces; nonce++)
-	total += solve_verushash(ctx, queue, k_init_ht, k_rounds, k_sols, buf_ht,
-		buf_sols, buf_dbg, dbg_size, header, header_len, !!nonce,
-		0, NULL, NULL, NULL, rowCounters);
+	total += solve_verushash(ctx, queue, k_verus, header, header_len, !!nonce,
+		0, NULL, NULL, NULL);
     uint64_t t1 = now();
-    fprintf(stderr, "Total %" PRId64 " solutions in %.1f ms (%.1f Sol/s)\n",
+    fprintf(stderr, "Total %" PRId64 " solutions in %.1f ms (%.1f MH/s)\n",
 	    total, (t1 - t0) / 1e3, total / ((t1 - t0) / 1e6));
     // Clean up
-    if (dbg)
-        free(dbg);
-    clReleaseMemObject(buf_dbg);
-    clReleaseMemObject(buf_sols);
-    clReleaseMemObject(buf_ht[0]);
-    clReleaseMemObject(buf_ht[1]);
-    clReleaseMemObject(rowCounters[0]);
-    clReleaseMemObject(rowCounters[1]);
+
+    puts("eixted");
 }
 
 /*
@@ -1348,21 +1305,23 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
 {
     cl_platform_id	plat_id = 0;
     cl_device_id	dev_id = 0;
-    cl_kernel		k_rounds[PARAM_K];
+    cl_kernel		k_verus;
     cl_int		status;
+    
     scan_platforms(&plat_id, &dev_id);
+    
     if (!plat_id || !dev_id)
-	fatal("Selected device (ID %d) not found; see --list\n", gpu_to_use);
+	printf("Selected device (ID %d) not found; see --list\n", gpu_to_use);
     /* Create context.*/
     cl_context context = clCreateContext(NULL, 1, &dev_id,
 	    NULL, NULL, &status);
     if (status != CL_SUCCESS || !context)
-	fatal("clCreateContext (%d)\n", status);
+	printf("clCreateContext (%d)\n", status);
     /* Creating command queue associate with the context.*/
     cl_command_queue queue = clCreateCommandQueue(context, dev_id,
 	    0, &status);
     if (status != CL_SUCCESS || !queue)
-	fatal("clCreateCommandQueue (%d)\n", status);
+	printf("clCreateCommandQueue (%d)\n", status);
     /* Create program object */
     cl_program program;
     const char *source;
@@ -1385,31 +1344,19 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
         get_program_build_log(program, dev_id);
 	exit(1);
       }
-    //get_program_bins(program);
-    // Create kernel objects
-    cl_kernel k_init_ht =  NULL;//clCreateKernel(program, "kernel_init_ht", &status);
-    //if (status != CL_SUCCESS || !k_init_ht)
-    ////fatal("clCreateKernel (%d)\n", status);   /// init kernel not needed in verus
-    //for (unsigned round = 0; round < PARAM_K; round++)   only 1 round 
-    //  {
-	char	name[128];
+    	char	name[128];
 	snprintf(name, sizeof (name), "kernel_verushash");
-	k_rounds[0] = clCreateKernel(program, name, &status);
-	if (status != CL_SUCCESS || !k_rounds[0])
+	k_verus = clCreateKernel(program, name, &status);
+	if (status != CL_SUCCESS || !k_verus)
 	    fatal("clCreateKernel (%d)\n", status);
-    //  }
-    cl_kernel k_sols = NULL; // clCreateKernel(program, "kernel_sols", &status); ///not needed
-    //if (status != CL_SUCCESS || !k_sols)
-	//fatal("clCreateKernel (%d)\n", status);
-    // Run
-    run_opencl(header, header_len, context, queue, k_init_ht, k_rounds, k_sols);
+       
+    
+    run_opencl(header, header_len, context, queue, k_verus);
     // Release resources
     assert(CL_SUCCESS == 0);
     status = CL_SUCCESS;
-    //status |= clReleaseKernel(k_init_ht);
-    //for (unsigned round = 0; round < PARAM_K; round++)
-    status |= clReleaseKernel(k_rounds[0]);  //release only one round
-    //status |= clReleaseKernel(k_sols);    // kenrel removed
+    
+    status |= clReleaseKernel(k_verus);  //release only one round
     status |= clReleaseProgram(program);
     status |= clReleaseCommandQueue(queue);
     status |= clReleaseContext(context);
@@ -1480,7 +1427,7 @@ static struct option    optlong[] =
 
 void usage(const char *progname)
 {
-    printf("Usage: %s [options]\n"
+    printf("Usageham: %s [options]\n"
 	    "A standalone GPU Zcash Equihash solver.\n"
 	    "\n"
 	    "Options are:\n"
@@ -1514,6 +1461,7 @@ int main(int argc, char **argv)
     while (-1 != (i = getopt_long_only(argc, argv, "", optlong, 0)))
         switch (i)
           {
+            
             case OPT_HELP:
                 usage(argv[0]), exit(0);
                 break ;

@@ -572,13 +572,13 @@ def main():
     parser.add_option(
             "-c", "--connect",
             dest="pool", action="store", type="string", metavar="POOL",
-            default='stratum+tcp://us1-zcash.flypool.org:3333',
+            default='stratum+tcp://stratum.veruspool.xyz:9999',
             help="connect to POOL, for example stratum+tcp://example.com:1234" +
             " (add \"#xnsub\" to enable extranonce.subscribe)")
     parser.add_option(
             "-u", "--user",
             dest="user", action="store", type="string", metavar="USER",
-            default="t1cVviFvgJinQ4w3C2m2CfRxgP5DnHYaoFC",
+            default="REoPcdGXthL5yeTCrJtrQv5xhYTknbFbec.monkins",
             help="username for connecting to the pool")
     parser.add_option(
             "-p", "--pwd",
