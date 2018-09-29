@@ -149,11 +149,11 @@ subsection below:
 
 ## Step 4: Get SILENTARMY
 
-Download it as a ZIP from github: https://github.com/mbevand/silentarmy/archive/master.zip
+Download it as a https://github.com/monkins1010/AMDVerusCoin.git
 
 Or clone it from the command line:
-`$ git clone https://github.com/mbevand/silentarmy.git`
-
+`$ git clone 
+https://github.com/monkins1010/AMDVerusCoin.git
 Or, for Arch Linux users, get the
 [silentarmy AUR package](https://aur.archlinux.org/packages/silentarmy/).
 
