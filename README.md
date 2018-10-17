@@ -1,16 +1,26 @@
 # SILENTARMY verus coin by monkins1010
 
-Quick instructions:
-mkdir silent
-cd silent
-git clone https://github.com/monkins1010/AMDVerusCoin.git
-cd AMDVerusCoin
-make
-nano run
+`Quick instructions:`
+
+`mkdir silent`
+
+`cd silent`
+
+`git clone https://github.com/monkins1010/AMDVerusCoin.git`
+
+`cd AMDVerusCoin`
+
+`make`
+
+`nano run`
+
 change the text to
-./silentarmy --use=0,1,2 --instances=1
-ctrl + x  y  then enter
-chmod +x run
+
+`./silentarmy --use=0,1,2 --instances=1`
+
+`ctrl + x  y  then enter`
+
+`chmod +x run`
 
 **Very important --instances=1** 
 
