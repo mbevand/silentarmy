@@ -1022,7 +1022,7 @@ uint32_t solve_verushash(cl_context ctx, cl_command_queue queue,
     free(ptarget);
     free(pnonces);
     free(pcounter);
-    return nonces_total;
+    return 0x8000000;
 }
 
 /*
@@ -1172,7 +1172,7 @@ void mining_mode(cl_context ctx, cl_command_queue queue,
         if ((t1 = now()) > t0 + status_period)
           {
             t0 = t1;
-            printf("status: %" PRId64 " %" PRId64 "\n", total, total_shares);
+            printf("status: %" PRId64 " %" PRId64 "\n", total/1000000, total_shares);
             fflush(stdout);
           }
       }
