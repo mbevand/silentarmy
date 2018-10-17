@@ -1,5 +1,19 @@
 # SILENTARMY verus coin by monkins1010
 
+Quick instructions:
+mkdir silent
+cd silent
+git clone https://github.com/monkins1010/AMDVerusCoin.git
+cd AMDVerusCoin
+make
+nano run
+change the text to
+./silentarmy --use=0,1,2 --instances=1
+ctrl + x  y  then enter
+chmod +x run
+
+**Very important --instances=1** 
+
 Written for the community BTC donations to Monkins1010 3HNYjR3FoVLpnZsjTNnPc51kt8g6gu3YfJ if you are so inclined :-)
 
 SILENTARMY Veruscoin is a free open source Opencl Veruscoin www.veruscoin.io  miner for Linux
