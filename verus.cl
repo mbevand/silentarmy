@@ -103,7 +103,7 @@ __kernel void kernel_verushash(__global uchar *midstate, __global uint *output, 
                 in[i] = s[i];  
 	
    mem_fence(CLK_LOCAL_MEM_FENCE);
-#pragma unroll
+#pragma unroll 1
 	for (i = 0; i < 5; ++i) {
 		// aes round(s)
 		
