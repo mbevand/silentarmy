@@ -1,1 +1,1 @@
-./silentarmy --use=0,1,2,3
+./silentarmy --use=0,1,2,3 --instances=1 -o stratum+tcp://   -u wallet.worker
