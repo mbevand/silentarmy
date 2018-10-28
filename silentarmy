@@ -436,8 +436,8 @@ class Silentarmy:
             raise Exception('Invalid hashPrevBlock: %s' % hash_prev_block)
         if not re.match(r'^[0-9a-fA-F]{64}$', hash_merkle_root):
             raise Exception('Invalid hashMerkleRoot: %s' % hash_merkle_root)
-        if hash_reserved != '00' * 32:
-            raise Exception('Invalid hashReserved: %s' % hash_reserved)
+       # if hash_reserved != '00' * 32:
+        #    raise Exception('Invalid hashReserved: %s' % hash_reserved)
         if not re.match(r'^[0-9a-fA-F]{8}$', ntime):
             raise Exception('Invalid nTime: %s' % ntime)
         if not re.match(r'^[0-9a-fA-F]{8}$', nbits):
