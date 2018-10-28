@@ -262,7 +262,7 @@ class Silentarmy:
             info_gpus = ', '.join(['dev%s %.1f' % (x[0], x[1])
                 for x in rate_gpus])
             shares = sum(self.total_shares.values())
-            print("Total %s sol/s [%s] %d share%s" % \
+            print("%s MH/s [%s] %d share%s" % \
                     (rate_avg, info_gpus, shares, '' if shares == 1 else 's'))
             sys.stdout.flush()
 
@@ -391,7 +391,7 @@ class Silentarmy:
         if not self.st_had_job:
             print('Stratum server sent us the first job')
             l = len(self.opts.use)
-            print('Mining on %d device%s' % (l, '' if l == 1 else 's'))
+            print('VerusCoin miner by Monkins1010, Mining on %d device%s' % (l, '' if l == 1 else 's'))
             self.st_had_job = True
         job = "%s %s %s %s\n" % (b2hex(self.target), self.job_id,
                 b2hex(self.zcash_nonceless_header),
