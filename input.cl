@@ -32,64 +32,21 @@ void aesenc(unsigned char *s, uchar *sharedMemory1)
 	uchar i, t, u;
 	uchar v[4][4];
 
-v[0][0] = sharedMemory1[s[0]]; 
-v[3][1] = sharedMemory1[s[1]]; 
-v[2][2] = sharedMemory1[s[2]]; 
-v[1][3] = sharedMemory1[s[3]]; 
-v[1][0] = sharedMemory1[s[4]]; 
-v[0][1] = sharedMemory1[s[5]]; 
-v[3][2] = sharedMemory1[s[6]]; 
-v[2][3] = sharedMemory1[s[7]]; 
-v[2][0] = sharedMemory1[s[8]]; 
-v[1][1] = sharedMemory1[s[9]]; 
-v[0][2] = sharedMemory1[s[10]]; 
-v[3][3] = sharedMemory1[s[11]]; 
-v[3][0] = sharedMemory1[s[12]]; 
-v[2][1] = sharedMemory1[s[13]]; 
-v[1][2] = sharedMemory1[s[14]]; 
-v[0][3] = sharedMemory1[s[15]]; 
+	for (i = 0; i < 16; ++i) {
+		v[((i >> 2) + 4 - (i & 3)) & 3][i & 3] = sharedMemory1[s[i]];
+	}
 
-t = v[0][0];	
-u = v[0][0] ^ v[0][1] ^ v[0][2] ^ v[0][3]; 
-v[0][0] = v[0][0] ^ u ^ XT(v[0][0] ^ v[0][1]); 
-v[0][1] = v[0][1] ^ u ^ XT(v[0][1] ^ v[0][2]); 
-v[0][2] = v[0][2] ^ u ^ XT(v[0][2] ^ v[0][3]); 
-v[0][3] = v[0][3] ^ u ^ XT(v[0][3] ^ t); 
-t = v[1][0]; 
-u = v[1][0] ^ v[1][1] ^ v[1][2] ^ v[1][3]; 
-v[1][0] = v[1][0] ^ u ^ XT(v[1][0] ^ v[1][1]); 
-v[1][1] = v[1][1] ^ u ^ XT(v[1][1] ^ v[1][2]); 
-v[1][2] = v[1][2] ^ u ^ XT(v[1][2] ^ v[1][3]); 
-v[1][3] = v[1][3] ^ u ^ XT(v[1][3] ^ t); 
-t = v[2][0]; 
-u = v[2][0] ^ v[2][1] ^ v[2][2] ^ v[2][3]; 
-v[2][0] = v[2][0] ^ u ^ XT(v[2][0] ^ v[2][1]); 
-v[2][1] = v[2][1] ^ u ^ XT(v[2][1] ^ v[2][2]); 
-v[2][2] = v[2][2] ^ u ^ XT(v[2][2] ^ v[2][3]); 
-v[2][3] = v[2][3] ^ u ^ XT(v[2][3] ^ t); 
-t = v[3][0]; 
-u = v[3][0] ^ v[3][1] ^ v[3][2] ^ v[3][3]; 
-v[3][0] = v[3][0] ^ u ^ XT(v[3][0] ^ v[3][1]); 
-v[3][1] = v[3][1] ^ u ^ XT(v[3][1] ^ v[3][2]); 
-v[3][2] = v[3][2] ^ u ^ XT(v[3][2] ^ v[3][3]); 
-v[3][3] = v[3][3] ^ u ^ XT(v[3][3] ^ t); 
-
-	s[0] = v[0][0]; 
-s[1] = v[0][1]; 
-s[2] = v[0][2]; 
-s[3] = v[0][3]; 
-s[4] = v[1][0]; 
-s[5] = v[1][1]; 
-s[6] = v[1][2]; 
-s[7] = v[1][3]; 
-s[8] = v[2][0]; 
-s[9] = v[2][1]; 
-s[10] = v[2][2]; 
-s[11] = v[2][3]; 
-s[12] = v[3][0]; 
-s[13] = v[3][1]; 
-s[14] = v[3][2]; 
-s[15] = v[3][3];
+	for (i = 0; i < 4; ++i) {
+		t = v[i][0];
+		u = v[i][0] ^ v[i][1] ^ v[i][2] ^ v[i][3];
+		v[i][0] = v[i][0] ^ u ^ XT(v[i][0] ^ v[i][1]);
+		v[i][1] = v[i][1] ^ u ^ XT(v[i][1] ^ v[i][2]);
+		v[i][2] = v[i][2] ^ u ^ XT(v[i][2] ^ v[i][3]);
+		v[i][3] = v[i][3] ^ u ^ XT(v[i][3] ^ t);
+	}
+	for (i = 0; i < 16; ++i) {
+		s[i] = (unsigned char)v[i >> 2][i & 3]; // VerusHash have 0 rc vector
+	}
 }
 
 // Simulate _mm_unpacklo_epi32
@@ -114,11 +71,11 @@ void unpackhi32(unsigned char *t, unsigned char *a, unsigned char *b)
 	memcpy_decker(t, tmp, 16);
 
 }
-__kernel __attribute__((reqd_work_group_size(256, 1, 1)))
+//__kernel __attribute__((reqd_work_group_size(256, 1, 1)))
 __kernel void kernel_verushash(__global uchar *midstate, __global ulong *output, __global ulong *target, __global ulong *throughput)
 { 
     //printf("horsemeat salad");
-	__private ulong gid = (ulong)get_global_id(0) + throughput[0];
+	__private ulong gid = ((uint)get_global_id(0) &0xffffffff) + throughput[0];
         __private uint lid = get_local_id(0);  
 	__private unsigned char s[64] , tmp[32];
         __local uchar sharedMemory1[256];   //sharemem fastest
@@ -144,8 +101,8 @@ __kernel void kernel_verushash(__global uchar *midstate, __global ulong *output,
 	for (i = 0; i < 64; ++i)
                 in[i] = s[i];  
 	
-   mem_fence(CLK_LOCAL_MEM_FENCE);
-
+ //  mem_fence(CLK_LOCAL_MEM_FENCE);
+#pragma unroll 5
 	for (i = 0; i < 5; ++i) {
 		// aes round(s)
 		
@@ -172,18 +129,24 @@ __kernel void kernel_verushash(__global uchar *midstate, __global ulong *output,
 	}
 
 	
-	for (i = 24; i < 56; i++) {
+	for (i = 0; i < 64; i++) {
 		s[i] = s[i] ^ in[i];
 	}
 
+	/* Truncated */
+	memcpy_decker(tmp, s + 8, 8);
+	memcpy_decker(tmp + 8, s + 24, 8);
+	memcpy_decker(tmp + 16, s + 32, 8);
 	memcpy_decker(tmp + 24, s + 48, 8);
-
+       // mem_fence(CLK_LOCAL_MEM_FENCE);  
 	   
     
 if(((ulong*)&tmp[0])[3] < target[3])
 { 
    output[0] = gid;
-
+ //  for (i = 0; i < 8; ++i)
+//printf("%02x",((uchar *)&gid)[i]);
+///printf("=gid\n");
 
 }
       
