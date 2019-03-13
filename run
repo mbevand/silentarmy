@@ -1,1 +1,1 @@
-./silentarmy --use=0,1,2,3 --instances=1 -o stratum+tcp://   -u wallet.worker
+./silentarmy --use=0 --instances=1 -c stratum+tcp://eu.luckpool.net:3956   -u wallet.worker -v -v
