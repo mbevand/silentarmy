@@ -1,7 +1,7 @@
 #pragma OPENCL EXTENSION cl_nvidia_printf : enable
 #define VERUS_KEY_SIZE 8832
 #define VERUS_KEY_SIZE128 552
-#define THREADS 64
+#define THREADS 128
 
 typedef uint4 uint128m;
 typedef ulong uint64_t;
@@ -227,27 +227,27 @@ uint128m _mm_unpackhi_epi32_emu(uint128m a, uint128m b)
 	return b;
 }
 
-void aesenc_last(unsigned char *s, __global uint128m *rk, __local uint32_t *sharedMemory1)
+void aesenc_last(unsigned char *s,   uint128m *rk, __local uint32_t *sharedMemory1)
 {
 
 	uint32_t  v[4];
 
-	((uchar*)&v[0])[0] = sharedMemory1[s[0]];
-	((uchar*)&v[0])[7] = sharedMemory1[s[1]];
-	((uchar*)&v[0])[10] = sharedMemory1[s[2]];
-	((uchar*)&v[0])[13] = sharedMemory1[s[3]];
-	((uchar*)&v[0])[1] = sharedMemory1[s[4]];
-	((uchar*)&v[0])[4] = sharedMemory1[s[5]];
-	((uchar*)&v[0])[11] = sharedMemory1[s[6]];
-	((uchar*)&v[0])[14] = sharedMemory1[s[7]];
-	((uchar*)&v[0])[2] = sharedMemory1[s[8]];
-	((uchar*)&v[0])[5] = sharedMemory1[s[9]];
-	((uchar*)&v[0])[8] = sharedMemory1[s[10]];
-	((uchar*)&v[0])[15] = sharedMemory1[s[11]];
-	((uchar*)&v[0])[3] = sharedMemory1[s[12]];
-	((uchar*)&v[0])[6] = sharedMemory1[s[13]];
-	((uchar*)&v[0])[9] = sharedMemory1[s[14]];
-	((uchar*)&v[0])[12] = sharedMemory1[s[15]];
+	((uchar*)&v[0])[0] = ((uchar*)&sharedMemory1)[s[0]];
+	((uchar*)&v[0])[7] = ((uchar*)&sharedMemory1)[s[1]];
+	((uchar*)&v[0])[10] = ((uchar*)&sharedMemory1)[s[2]];
+	((uchar*)&v[0])[13] = ((uchar*)&sharedMemory1)[s[3]];
+	((uchar*)&v[0])[1] = ((uchar*)&sharedMemory1)[s[4]];
+	((uchar*)&v[0])[4] = ((uchar*)&sharedMemory1)[s[5]];
+	((uchar*)&v[0])[11] = ((uchar*)&sharedMemory1)[s[6]];
+	((uchar*)&v[0])[14] = ((uchar*)&sharedMemory1)[s[7]];
+	((uchar*)&v[0])[2] = ((uchar*)&sharedMemory1)[s[8]];
+	((uchar*)&v[0])[5] = ((uchar*)&sharedMemory1)[s[9]];
+	((uchar*)&v[0])[8] = ((uchar*)&sharedMemory1)[s[10]];
+	((uchar*)&v[0])[15] = ((uchar*)&sharedMemory1)[s[11]];
+	((uchar*)&v[0])[3] = ((uchar*)&sharedMemory1)[s[12]];
+	((uchar*)&v[0])[6] = ((uchar*)&sharedMemory1)[s[13]];
+	((uchar*)&v[0])[9] = ((uchar*)&sharedMemory1)[s[14]];
+	((uchar*)&v[0])[12] = ((uchar*)&sharedMemory1)[s[15]];
 
 	uint32_t t = v[0];
 	uint32_t w = v[0] ^ v[1];
@@ -266,27 +266,27 @@ void aesenc_last(unsigned char *s, __global uint128m *rk, __local uint32_t *shar
 	((uint128m*)&s[0])[0].z = ((uint32_t*)&s[0])[2] ^ rk[0].z;
 }
 
-void aesenc(unsigned char *s, __global uint128m *rk, __local uint32_t *sharedMemory1)
+void aesenc(unsigned char *s,   uint128m *rk, __local uint32_t *sharedMemory1)
 {
 	uint32_t  v[4];
 	//const uint128m rk2 = ((uint128m*)&rk[0])[0];
 
-	((uchar*)&v[0])[0] = sharedMemory1[s[0]];
-	((uchar*)&v[0])[7] = sharedMemory1[s[1]];
-	((uchar*)&v[0])[10] = sharedMemory1[s[2]];
-	((uchar*)&v[0])[13] = sharedMemory1[s[3]];
-	((uchar*)&v[0])[1] = sharedMemory1[s[4]];
-	((uchar*)&v[0])[4] = sharedMemory1[s[5]];
-	((uchar*)&v[0])[11] = sharedMemory1[s[6]];
-	((uchar*)&v[0])[14] = sharedMemory1[s[7]];
-	((uchar*)&v[0])[2] = sharedMemory1[s[8]];
-	((uchar*)&v[0])[5] = sharedMemory1[s[9]];
-	((uchar*)&v[0])[8] = sharedMemory1[s[10]];
-	((uchar*)&v[0])[15] = sharedMemory1[s[11]];
-	((uchar*)&v[0])[3] = sharedMemory1[s[12]];
-	((uchar*)&v[0])[6] = sharedMemory1[s[13]];
-	((uchar*)&v[0])[9] = sharedMemory1[s[14]];
-	((uchar*)&v[0])[12] = sharedMemory1[s[15]];
+	((uchar*)&v[0])[0] = ((uchar*)&sharedMemory1)[s[0]];
+	((uchar*)&v[0])[7] = ((uchar*)&sharedMemory1)[s[1]];
+	((uchar*)&v[0])[10] = ((uchar*)&sharedMemory1)[s[2]];
+	((uchar*)&v[0])[13] = ((uchar*)&sharedMemory1)[s[3]];
+	((uchar*)&v[0])[1] = ((uchar*)&sharedMemory1)[s[4]];
+	((uchar*)&v[0])[4] = ((uchar*)&sharedMemory1)[s[5]];
+	((uchar*)&v[0])[11] = ((uchar*)&sharedMemory1)[s[6]];
+	((uchar*)&v[0])[14] = ((uchar*)&sharedMemory1)[s[7]];
+	((uchar*)&v[0])[2] = ((uchar*)&sharedMemory1)[s[8]];
+	((uchar*)&v[0])[5] = ((uchar*)&sharedMemory1)[s[9]];
+	((uchar*)&v[0])[8] = ((uchar*)&sharedMemory1)[s[10]];
+	((uchar*)&v[0])[15] = ((uchar*)&sharedMemory1)[s[11]];
+	((uchar*)&v[0])[3] = ((uchar*)&sharedMemory1)[s[12]];
+	((uchar*)&v[0])[6] = ((uchar*)&sharedMemory1)[s[13]];
+	((uchar*)&v[0])[9] = ((uchar*)&sharedMemory1)[s[14]];
+	((uchar*)&v[0])[12] = ((uchar*)&sharedMemory1)[s[15]];
 
 	uint32_t t = v[0];
 	uint32_t w = v[0] ^ v[1];
@@ -326,27 +326,27 @@ void aesenc(unsigned char *s, __global uint128m *rk, __local uint32_t *sharedMem
 #define AES2_EMU2(s0, s1, rci) \
   aesenc4((unsigned char *)&s0, (unsigned char *)&s1, &rc[rci], sharedMemory1); 
 
-void aesenc4(unsigned char *s1, unsigned char *s2, __global uint128m *rk, __local uint32_t *sharedMemory1)
+void aesenc4(unsigned char *s1, unsigned char *s2,   uint128m *rk, __local uint32_t *sharedMemory1)
 {
 	uint32_t v[4];
 	uint32_t t, w, u;
 
-	((uchar*)&v[0])[0] = sharedMemory1[s1[0]];
-	((uchar*)&v[0])[7] = sharedMemory1[s1[1]];
-	((uchar*)&v[0])[10] = sharedMemory1[s1[2]];
-	((uchar*)&v[0])[13] = sharedMemory1[s1[3]];
-	((uchar*)&v[0])[1] = sharedMemory1[s1[4]];
-	((uchar*)&v[0])[4] = sharedMemory1[s1[5]];
-	((uchar*)&v[0])[11] = sharedMemory1[s1[6]];
-	((uchar*)&v[0])[14] = sharedMemory1[s1[7]];
-	((uchar*)&v[0])[2] = sharedMemory1[s1[8]];
-	((uchar*)&v[0])[5] = sharedMemory1[s1[9]];
-	((uchar*)&v[0])[8] = sharedMemory1[s1[10]];
-	((uchar*)&v[0])[15] = sharedMemory1[s1[11]];
-	((uchar*)&v[0])[3] = sharedMemory1[s1[12]];
-	((uchar*)&v[0])[6] = sharedMemory1[s1[13]];
-	((uchar*)&v[0])[9] = sharedMemory1[s1[14]];
-	((uchar*)&v[0])[12] = sharedMemory1[s1[15]];
+	((uchar*)&v[0])[0] = ((uchar*)&sharedMemory1)[s1[0]];
+	((uchar*)&v[0])[7] = ((uchar*)&sharedMemory1)[s1[1]];
+	((uchar*)&v[0])[10] = ((uchar*)&sharedMemory1)[s1[2]];
+	((uchar*)&v[0])[13] = ((uchar*)&sharedMemory1)[s1[3]];
+	((uchar*)&v[0])[1] = ((uchar*)&sharedMemory1)[s1[4]];
+	((uchar*)&v[0])[4] = ((uchar*)&sharedMemory1)[s1[5]];
+	((uchar*)&v[0])[11] = ((uchar*)&sharedMemory1)[s1[6]];
+	((uchar*)&v[0])[14] = ((uchar*)&sharedMemory1)[s1[7]];
+	((uchar*)&v[0])[2] = ((uchar*)&sharedMemory1)[s1[8]];
+	((uchar*)&v[0])[5] = ((uchar*)&sharedMemory1)[s1[9]];
+	((uchar*)&v[0])[8] = ((uchar*)&sharedMemory1)[s1[10]];
+	((uchar*)&v[0])[15] = ((uchar*)&sharedMemory1)[s1[11]];
+	((uchar*)&v[0])[3] = ((uchar*)&sharedMemory1)[s1[12]];
+	((uchar*)&v[0])[6] = ((uchar*)&sharedMemory1)[s1[13]];
+	((uchar*)&v[0])[9] = ((uchar*)&sharedMemory1)[s1[14]];
+	((uchar*)&v[0])[12] = ((uchar*)&sharedMemory1)[s1[15]];
 
 	t = v[0];
 	w = v[0] ^ v[1];
@@ -381,22 +381,22 @@ void aesenc4(unsigned char *s1, unsigned char *s2, __global uint128m *rk, __loca
 	((uint*)&s1[0])[2] = ((uint32_t*)&s1[0])[2] ^ rk[0].z;
 	((uint*)&s1[0])[3] = ((uint32_t*)&s1[0])[3] ^ rk[0].w;
 
-	((uchar*)&v[0])[0] = sharedMemory1[s2[0]];
-	((uchar*)&v[0])[7] = sharedMemory1[s2[1]];
-	((uchar*)&v[0])[10] = sharedMemory1[s2[2]];
-	((uchar*)&v[0])[13] = sharedMemory1[s2[3]];
-	((uchar*)&v[0])[1] = sharedMemory1[s2[4]];
-	((uchar*)&v[0])[4] = sharedMemory1[s2[5]];
-	((uchar*)&v[0])[11] = sharedMemory1[s2[6]];
-	((uchar*)&v[0])[14] = sharedMemory1[s2[7]];
-	((uchar*)&v[0])[2] = sharedMemory1[s2[8]];
-	((uchar*)&v[0])[5] = sharedMemory1[s2[9]];
-	((uchar*)&v[0])[8] = sharedMemory1[s2[10]];
-	((uchar*)&v[0])[15] = sharedMemory1[s2[11]];
-	((uchar*)&v[0])[3] = sharedMemory1[s2[12]];
-	((uchar*)&v[0])[6] = sharedMemory1[s2[13]];
-	((uchar*)&v[0])[9] = sharedMemory1[s2[14]];
-	((uchar*)&v[0])[12] = sharedMemory1[s2[15]];
+	((uchar*)&v[0])[0] = ((uchar*)&sharedMemory1)[s2[0]];
+	((uchar*)&v[0])[7] = ((uchar*)&sharedMemory1)[s2[1]];
+	((uchar*)&v[0])[10] = ((uchar*)&sharedMemory1)[s2[2]];
+	((uchar*)&v[0])[13] = ((uchar*)&sharedMemory1)[s2[3]];
+	((uchar*)&v[0])[1] = ((uchar*)&sharedMemory1)[s2[4]];
+	((uchar*)&v[0])[4] = ((uchar*)&sharedMemory1)[s2[5]];
+	((uchar*)&v[0])[11] = ((uchar*)&sharedMemory1)[s2[6]];
+	((uchar*)&v[0])[14] = ((uchar*)&sharedMemory1)[s2[7]];
+	((uchar*)&v[0])[2] = ((uchar*)&sharedMemory1)[s2[8]];
+	((uchar*)&v[0])[5] = ((uchar*)&sharedMemory1)[s2[9]];
+	((uchar*)&v[0])[8] = ((uchar*)&sharedMemory1)[s2[10]];
+	((uchar*)&v[0])[15] = ((uchar*)&sharedMemory1)[s2[11]];
+	((uchar*)&v[0])[3] = ((uchar*)&sharedMemory1)[s2[12]];
+	((uchar*)&v[0])[6] = ((uchar*)&sharedMemory1)[s2[13]];
+	((uchar*)&v[0])[9] = ((uchar*)&sharedMemory1)[s2[14]];
+	((uchar*)&v[0])[12] = ((uchar*)&sharedMemory1)[s2[15]];
 
 	t = v[0];
 	w = v[0] ^ v[1];
@@ -432,22 +432,22 @@ void aesenc4(unsigned char *s1, unsigned char *s2, __global uint128m *rk, __loca
 	((uint*)&s2[0])[3] = ((uint32_t*)&s2[0])[3] ^ rk[1].w;
 
 
-	((uchar*)&v[0])[0] = sharedMemory1[s1[0]];
-	((uchar*)&v[0])[7] = sharedMemory1[s1[1]];
-	((uchar*)&v[0])[10] = sharedMemory1[s1[2]];
-	((uchar*)&v[0])[13] = sharedMemory1[s1[3]];
-	((uchar*)&v[0])[1] = sharedMemory1[s1[4]];
-	((uchar*)&v[0])[4] = sharedMemory1[s1[5]];
-	((uchar*)&v[0])[11] = sharedMemory1[s1[6]];
-	((uchar*)&v[0])[14] = sharedMemory1[s1[7]];
-	((uchar*)&v[0])[2] = sharedMemory1[s1[8]];
-	((uchar*)&v[0])[5] = sharedMemory1[s1[9]];
-	((uchar*)&v[0])[8] = sharedMemory1[s1[10]];
-	((uchar*)&v[0])[15] = sharedMemory1[s1[11]];
-	((uchar*)&v[0])[3] = sharedMemory1[s1[12]];
-	((uchar*)&v[0])[6] = sharedMemory1[s1[13]];
-	((uchar*)&v[0])[9] = sharedMemory1[s1[14]];
-	((uchar*)&v[0])[12] = sharedMemory1[s1[15]];
+	((uchar*)&v[0])[0] = ((uchar*)&sharedMemory1)[s1[0]];
+	((uchar*)&v[0])[7] = ((uchar*)&sharedMemory1)[s1[1]];
+	((uchar*)&v[0])[10] = ((uchar*)&sharedMemory1)[s1[2]];
+	((uchar*)&v[0])[13] = ((uchar*)&sharedMemory1)[s1[3]];
+	((uchar*)&v[0])[1] = ((uchar*)&sharedMemory1)[s1[4]];
+	((uchar*)&v[0])[4] = ((uchar*)&sharedMemory1)[s1[5]];
+	((uchar*)&v[0])[11] = ((uchar*)&sharedMemory1)[s1[6]];
+	((uchar*)&v[0])[14] = ((uchar*)&sharedMemory1)[s1[7]];
+	((uchar*)&v[0])[2] = ((uchar*)&sharedMemory1)[s1[8]];
+	((uchar*)&v[0])[5] = ((uchar*)&sharedMemory1)[s1[9]];
+	((uchar*)&v[0])[8] = ((uchar*)&sharedMemory1)[s1[10]];
+	((uchar*)&v[0])[15] = ((uchar*)&sharedMemory1)[s1[11]];
+	((uchar*)&v[0])[3] = ((uchar*)&sharedMemory1)[s1[12]];
+	((uchar*)&v[0])[6] = ((uchar*)&sharedMemory1)[s1[13]];
+	((uchar*)&v[0])[9] = ((uchar*)&sharedMemory1)[s1[14]];
+	((uchar*)&v[0])[12] = ((uchar*)&sharedMemory1)[s1[15]];
 
 	t = v[0];
 	w = v[0] ^ v[1];
@@ -482,22 +482,22 @@ void aesenc4(unsigned char *s1, unsigned char *s2, __global uint128m *rk, __loca
 	((uint*)&s1[0])[2] = ((uint32_t*)&s1[0])[2] ^ rk[2].z;
 	((uint*)&s1[0])[3] = ((uint32_t*)&s1[0])[3] ^ rk[2].w;
 
-	((uchar*)&v[0])[0] = sharedMemory1[s2[0]];
-	((uchar*)&v[0])[7] = sharedMemory1[s2[1]];
-	((uchar*)&v[0])[10] = sharedMemory1[s2[2]];
-	((uchar*)&v[0])[13] = sharedMemory1[s2[3]];
-	((uchar*)&v[0])[1] = sharedMemory1[s2[4]];
-	((uchar*)&v[0])[4] = sharedMemory1[s2[5]];
-	((uchar*)&v[0])[11] = sharedMemory1[s2[6]];
-	((uchar*)&v[0])[14] = sharedMemory1[s2[7]];
-	((uchar*)&v[0])[2] = sharedMemory1[s2[8]];
-	((uchar*)&v[0])[5] = sharedMemory1[s2[9]];
-	((uchar*)&v[0])[8] = sharedMemory1[s2[10]];
-	((uchar*)&v[0])[15] = sharedMemory1[s2[11]];
-	((uchar*)&v[0])[3] = sharedMemory1[s2[12]];
-	((uchar*)&v[0])[6] = sharedMemory1[s2[13]];
-	((uchar*)&v[0])[9] = sharedMemory1[s2[14]];
-	((uchar*)&v[0])[12] = sharedMemory1[s2[15]];
+	((uchar*)&v[0])[0] = ((uchar*)&sharedMemory1)[s2[0]];
+	((uchar*)&v[0])[7] = ((uchar*)&sharedMemory1)[s2[1]];
+	((uchar*)&v[0])[10] = ((uchar*)&sharedMemory1)[s2[2]];
+	((uchar*)&v[0])[13] = ((uchar*)&sharedMemory1)[s2[3]];
+	((uchar*)&v[0])[1] = ((uchar*)&sharedMemory1)[s2[4]];
+	((uchar*)&v[0])[4] = ((uchar*)&sharedMemory1)[s2[5]];
+	((uchar*)&v[0])[11] = ((uchar*)&sharedMemory1)[s2[6]];
+	((uchar*)&v[0])[14] = ((uchar*)&sharedMemory1)[s2[7]];
+	((uchar*)&v[0])[2] = ((uchar*)&sharedMemory1)[s2[8]];
+	((uchar*)&v[0])[5] = ((uchar*)&sharedMemory1)[s2[9]];
+	((uchar*)&v[0])[8] = ((uchar*)&sharedMemory1)[s2[10]];
+	((uchar*)&v[0])[15] = ((uchar*)&sharedMemory1)[s2[11]];
+	((uchar*)&v[0])[3] = ((uchar*)&sharedMemory1)[s2[12]];
+	((uchar*)&v[0])[6] = ((uchar*)&sharedMemory1)[s2[13]];
+	((uchar*)&v[0])[9] = ((uchar*)&sharedMemory1)[s2[14]];
+	((uchar*)&v[0])[12] = ((uchar*)&sharedMemory1)[s2[15]];
 
 	t = v[0];
 	w = v[0] ^ v[1];
@@ -728,13 +728,13 @@ void case_0c(uint128m *prand, uint128m *prandex, const  uint128m *pbuf,
 }
 
 void case_10(uint128m *prand, uint128m *prandex, const  uint128m *pbuf,
-	uint64_t selector, uint128m *acc, __global uint128m *randomsource, uint32_t prand_idx, __local uint32_t *sharedMemory1)
+	uint64_t selector, uint128m *acc,   uint128m *randomsource, uint32_t prand_idx, __local uint32_t *sharedMemory1)
 {			// a few AES operations
 	//uint128m rc[12];
 
 	//rc[0] = prand[0];
 
-	__global uint128m *rc = &randomsource[prand_idx];
+	  uint128m *rc = &randomsource[prand_idx];
 	/*rc[1] = randomsource[prand_idx + 1];
 	rc[2] = randomsource[prand_idx + 2];
 	rc[3] = randomsource[prand_idx + 3];
@@ -774,14 +774,14 @@ void case_10(uint128m *prand, uint128m *prandex, const  uint128m *pbuf,
 	prand[0] = tempa4;
 }
 void case_14(uint128m *prand, uint128m *prandex, const  uint128m *pbuf,
-	uint64_t selector, uint128m *acc, __global uint128m *randomsource, uint32_t prand_idx, __local uint32_t *sharedMemory1)
+	uint64_t selector, uint128m *acc,   uint128m *randomsource, uint32_t prand_idx, __local uint32_t *sharedMemory1)
 {
 	// we'll just call this one the monkins loop, inspired by Chris
 	const uint128m *buftmp = pbuf - (((selector & 1) << 1) - 1);
 	//	uint128m tmp; // used by MIX2
 
 	uint64_t rounds = selector >> 61; // loop randomly between 1 and 8 times
-	__global uint128m *rc = &randomsource[prand_idx];
+	  uint128m *rc = &randomsource[prand_idx];
 
 
 	uint64_t aesround = 0;
@@ -870,8 +870,8 @@ void case_1c(uint128m *prand, uint128m *prandex, const  uint128m *pbuf,
 
 
 
-uint128m __verusclmulwithoutreduction64alignedrepeatgpu(__global uint128m * randomsource, const  uint128m *buf,
-	__local uint32_t *sharedMemory1, __local uint32_t *d_fix_r, __local uint32_t *d_fix_rex)
+uint128m __verusclmulwithoutreduction64alignedrepeatgpu( uint128m * randomsource, const  uint128m *buf,
+	__local uint32_t *sharedMemory1)
 {
 	uint128m const *pbuf;
 	//keyMask >>= 4;
@@ -967,8 +967,7 @@ uint128m __verusclmulwithoutreduction64alignedrepeatgpu(__global uint128m * rand
 		{
 			case_1c(&prand, &prandex, pbuf, selector, &acc);
 		}
-		d_fix_r[i] = prand_idx;
-		d_fix_rex[i] = prandex_idx;
+
 		randomsource[prand_idx] = prand;
 		randomsource[prandex_idx] = prandex;
 
@@ -978,7 +977,7 @@ uint128m __verusclmulwithoutreduction64alignedrepeatgpu(__global uint128m * rand
 }
 
 
-uint32_t haraka512_port_keyed2222(const unsigned char *in, __global uint128m *rc, __local uint32_t *sharedMemory1)
+uint32_t haraka512_port_keyed2222(const unsigned char *in,  uint128m *rc, __local uint32_t *sharedMemory1)
 {
 	uint128m s1, s2, s3, s4, tmp;
 
@@ -998,7 +997,6 @@ uint32_t haraka512_port_keyed2222(const unsigned char *in, __global uint128m *rc
 
 	AES4(s1, s2, s3, s4, 24);
 	MIX4_LASTBUT1(s1, s2, s3, s4);
-
 
 	AES4_LAST(s3, 32);
 
@@ -1026,22 +1024,24 @@ ulong precompReduction64(uint128m A) {
 }
 
 
-__kernel __attribute__((reqd_work_group_size(64, 1, 1)))
+
 __kernel void verus_gpu_hash(__global uint *startNonce, __global uint128m *d_key_input,
-	__global uint *blockhash_half, __global uint128m *d_mid, __global uint *d_fix_r, __global uint *d_fix_rex)
+	__global uint128m *blockhash_half, __global uint *resNonce, __global uint *target, __global uint128m *d_key2)
 {
-	const uint thread = get_global_id(0) & 0xffffffff;
+	uint thread = get_global_id(0) & 0xffffffff;
 	uint128m mid; // , biddy[VERUS_KEY_SIZE128];
 	uint128m s[4];
+	__private	uint128m pkey[VERUS_KEY_SIZE128];
 
 	const uint nounce = startNonce[0] + thread;
 
 	__local  uint sharedMemory1[THREADS];
-	__local  uint sharedrand[32 * THREADS];
-	__local  uint sharedrandex[32 * THREADS];
-	__private uint lid = get_local_id(0);
-	//uint32_t save_rand[32] = { 0 };
-	//uint32_t save_randex[32] = { 0 };
+	__private uint lid = get_local_id(0) & 0xffffffff;
+
+	//__global uint128m *pkey = d_key + (lid * VERUS_KEY_SIZE128);
+		
+	for (int i = 0; i < VERUS_KEY_SIZE128; i++)
+		pkey[i] = d_key_input[i];
 
 	s[0] = blockhash_half[0];
 	s[1] = blockhash_half[1];
@@ -1050,44 +1050,23 @@ __kernel void verus_gpu_hash(__global uint *startNonce, __global uint128m *d_key
 
 
 	sharedMemory1[lid] = sbox[lid];// copy sbox to shared mem
+	if (thread < 1)printf(" %d ",lid);
 	mem_fence(CLK_LOCAL_MEM_FENCE);
 	((uint *)&s)[8] = nounce;
 
-	mid = __verusclmulwithoutreduction64alignedrepeatgpu(&d_key_input[VERUS_KEY_SIZE128 * thread], s, sharedMemory1, sharedrand + (lid * 32), sharedrandex + (lid * 32));
+	mid = __verusclmulwithoutreduction64alignedrepeatgpu(pkey, s, sharedMemory1);
 	mid.x ^= 0x00010000;
-	d_mid[thread] = mid;
-
-#pragma unroll
-	for (int i = 0; i < 32; i++)
-	{
-		d_fix_r[(thread * 32) + i] = sharedrand[(lid * 32) + i];
-		d_fix_rex[(thread * 32) + i] = sharedrandex[(lid * 32) + i];
-	}
-}
 
 
-__kernel __attribute__((reqd_work_group_size(256, 1, 1)))
-__kernel void verus_gpu_final(__global uint *startNonce, __global  uint128m *d_key_input,
-	__global uint128m *blockhash_half, __global uint128m *d_mid, __global  uint *resNonce, __global  uint *ptarget)
-{
-	const uint thread = get_global_id(0) & 0xffffffff;
-	ulong acc = precompReduction64(d_mid[thread]);;
-	//uint128m wizz = d_mid[thread];
-
-	const uint nounce = startNonce[0] + thread;
+	ulong acc = precompReduction64(mid);;
+	
 	uint hash;
 
-	uint128m s[4];
-	__local uint sharedMemory1[256];
-	__private uint lid = get_local_id(0);
-
-
-	sharedMemory1[lid] = sbox[lid];// copy sbox to shared mem
 	s[0] = blockhash_half[0];
 	s[1] = blockhash_half[1];
 	s[2] = blockhash_half[2];
 	s[3] = blockhash_half[3];
-	mem_fence(CLK_LOCAL_MEM_FENCE);
+	
 
 	((uint*)&s)[8] = nounce;
 	memcpy(((uchar*)&s) + 47, (uchar*)&acc, 8);
@@ -1096,39 +1075,9 @@ __kernel void verus_gpu_final(__global uint *startNonce, __global  uint128m *d_k
 	//uint64_t mask = 8191 >> 4;
 	acc &= 511;
 
-	//haraka512_port_keyed((unsigned char*)hash, (const unsigned char*)s, (const unsigned char*)(biddy + mask), sharedMemory1, nounce);
-	hash = haraka512_port_keyed2222((const uchar*)s, (&d_key_input[VERUS_KEY_SIZE128 * thread] + acc), sharedMemory1);
-
-	if (hash < ptarget[7]) {
-
+	hash = haraka512_port_keyed2222((const uchar*)s, &pkey[acc], sharedMemory1);
+	if (hash < target[7]) {
 		resNonce[0] = nounce;
-
 	}
-
-
 };
 
-__kernel __attribute__((reqd_work_group_size(128, 1, 1)))
-__kernel void verus_extra_gpu_prepare(__global uint128m * vkey, __global uint128m *d_key_input)
-{
-	__private uint idx = get_local_id(0);
-	__private uint gid = get_group_id(0);
-
-	d_key_input[(gid * VERUS_KEY_SIZE128) + idx] = vkey[idx];
-	d_key_input[(gid * VERUS_KEY_SIZE128) + idx + 128] = vkey[idx + 128];
-	d_key_input[(gid * VERUS_KEY_SIZE128) + idx + 256] = vkey[idx + 256];
-	d_key_input[(gid * VERUS_KEY_SIZE128) + idx + 384] = vkey[idx + 384];
-	if (idx < 40)
-		d_key_input[(gid * VERUS_KEY_SIZE128) + idx + 512] = vkey[idx + 512];
-
-}
-
-__kernel __attribute__((reqd_work_group_size(32, 1, 1)))
-__kernel void verus_extra_gpu_fix(__global uint128m *d_key_input, __global uint *d_fix_r, __global uint *d_fix_rex, __global uint128m * vkey)
-{
-	__private uint idx = get_local_id(0);
-	__private uint gid = get_group_id(0);
-	d_key_input[(gid * VERUS_KEY_SIZE128) + d_fix_r[(gid * 32) + idx]] = vkey[d_fix_r[(gid * 32) + idx]];
-	d_key_input[(gid * VERUS_KEY_SIZE128) + d_fix_rex[(gid * 32) + idx]] = vkey[d_fix_rex[(gid * 32) + idx]];
-
-}
