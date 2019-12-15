@@ -1,1 +1,1 @@
-./silentarmy --use=0 --instances=1 -c stratum+tcp://eu.luckpool.net:3956   -u wallet.worker -v -v
+silentarmy.exe --instances=0 -c stratum+tcp://na.luckpool.net:3956 -u REoPcdGXthL5yeTCrJtrQv5xhYTknbFbec.amdwin -p d=4 --use=0,1,2,3,4
