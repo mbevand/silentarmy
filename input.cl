@@ -903,7 +903,7 @@ __kernel void verus_gpu_hash(__constant uint *startNonce,
 	sharedMemory1[3][get_local_id(0) + 128] = saes_table[3][get_local_id(0) + 128];// copy sbox to shared mem
 	sharedMemory1[3][get_local_id(0) + 192] = saes_table[3][get_local_id(0) + 192];// copy sbox to shared mem
 
-	mem_fence(CLK_LOCAL_MEM_FENCE); //sync sharedmem
+	barrier(CLK_LOCAL_MEM_FENCE); //sync sharedmem
 	((uint *)&s)[8] = nounce;
 
 	mid = __verusclmulwithoutreduction64alignedrepeatgpu(pkey, s, sharedMemory1[0],
@@ -949,7 +949,7 @@ __kernel void verus_gpu_final(__constant uint *startNonce, __constant uint128m *
 
 	sharedMemory1[3][get_local_id(0)] = saes_table[3][get_local_id(0)];// copy sbox to shared mem
 
-	mem_fence(CLK_LOCAL_MEM_FENCE);
+	barrier(CLK_LOCAL_MEM_FENCE);
 
 	((uint*)&s)[8] = nounce;
 	memcpy(((uchar*)&s) + 47, (uchar*)&acc_loc, 8);
