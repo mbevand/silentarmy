@@ -1,7 +1,7 @@
 
 #define VERUS_KEY_SIZE 8832
 #define VERUS_KEY_SIZE128 552
-#define THREADS 64
+
 
 typedef uint4 uint128m;
 typedef ulong uint64_t;
@@ -12,17 +12,6 @@ typedef int int32_t;
 typedef short int16_t;
 typedef unsigned short uint16_t;
   
-// Simulate C memcpy uint32_t*
-void memcpy_uint(unsigned int *dst, unsigned int *src, int len) {
-    int i;
-    for (i=0;i<len;i++) { dst[i] = src[i]; }
-}
-
-// Simulate C memcpy
-void memcpy(unsigned char *dst, unsigned char *src, int len) {
-    int i;
-    for (i=0;i<len;i++) { dst[i] = src[i]; }
-}
 
 #define AES2_EMU(s0, s1, rci) \
   aesenc((unsigned char *)&s0, &rc[rci],sharedMemory1); \
@@ -134,20 +123,20 @@ uint32_t xor3x(uint a, uint b, uint c) {
 	return result;
 }
 
-uint128m _mm_xor_si128_emu(uint128m a, uint128m b)
-{
-
-	return a ^ b;
-}
+#define _mm_xor_si128_emu(a, b) (a ^ b)
 
 
+#define LIMMY_R(x, y, z) ( x >> z | (y << (32 - z)))
 
 uint128m _mm_clmulepi64_si128_emu(uint128m ai, uint128m bi, int imm)
 {
 	uint64_t a = ((uint64_t*)&ai)[0]; 
 
 	uint64_t b = ((uint64_t*)&bi)[1];
-	
+
+
+
+
 	uint8_t  i; 
 
 	uint64_t u[8];
@@ -166,17 +155,17 @@ uint128m _mm_clmulepi64_si128_emu(uint128m ai, uint128m bi, int imm)
 	((uint64_t*)&r)[0] = u[a & 7]; //first window only affects lower word
 
 	r.z = r.w = 0;
-	#pragma unroll
+	//#pragma unroll
 	for (i = 3; i < 64; i += 3) {
 		tmp = u[a >> i & 7];
-	//	((uint64_t*)&r)[0] ^= tmp << i;
-		r.x ^= (tmp << i) & 0xffffffff;
-		r.y ^= ((tmp << i) & 0xffffffff00000000) >> 32;
-	//	((uint64_t*)&r)[1] ^= tmp >> (64 - i);
-		r.z ^= (tmp >> (64 - i)) & 0xffffffff;
-		r.w ^= ((tmp >> (64 - i)) & 0xffffffff00000000) >> 32;
+		((uint64_t*)&r)[0] ^= tmp << i;
+	//	r.x ^= (tmp << i) & 0xffffffff ;
+	//	r.y ^= (((tmp << i) ) >> 32) & 0xffffffff ;
+		((uint64_t*)&r)[1] ^= tmp >> (64 - i);
+		//r.z ^= (tmp >> (64 - i)) & 0xffffffff ;
+		//r.w ^= (((tmp >> (64 - i)) ) >> 32) & 0xffffffff ;
 	}
-#define LIMMY_R(x, y, z) ( x >> z | (y << (32 - z)))
+
 
 	if ((bi.w ) & 0x80000000)
 	{
@@ -192,8 +181,8 @@ uint128m _mm_clmulepi64_si128_emu(uint128m ai, uint128m bi, int imm)
 		r.z ^= (t0 & 0x49249249); //0, 21x 100
 		r.w ^= (t1 & 0x12492492); //0x4924924924924924 -> 0x1249249249249249 after >>2
 	}
-
-	return r;
+	
+	return ((uint128m*)&r)[0];
 }
 
 
@@ -270,8 +259,7 @@ uint128m _mm_unpackhi_epi32_emu(uint128m a, uint128m b)
 }
 
 
-
-inline void aesenc(unsigned char *s, __global   uint128m *key, __local uint *t)
+ void aesenc(unsigned char *s, __global   uint128m *key, __local uint *t)
 {
 	uint128m x0 = ((uint128m*)s)[0];
 
@@ -304,38 +292,8 @@ inline void aesenc(unsigned char *s, __global   uint128m *key, __local uint *t)
 
 }
 
-inline void aesenc_loc(unsigned char *s, uint128m *key, __local uint *t)
-{
-	uint128m x0 = ((uint128m*)s)[0];
 
-	uint128m y0 = { 0,0,0,0 };
-	y0.x ^= t[x0.x & 0xff]; x0.x >>= 8;
-	y0.y ^= t[x0.y & 0xff]; x0.y >>= 8;
-	y0.z ^= t[x0.z & 0xff]; x0.z >>= 8;
-	y0.w ^= t[x0.w & 0xff]; x0.w >>= 8;
-	t += 256;
 
-	y0.x ^= t[x0.y & 0xff]; x0.y >>= 8;
-	y0.y ^= t[x0.z & 0xff]; x0.z >>= 8;
-	y0.z ^= t[x0.w & 0xff]; x0.w >>= 8;
-	y0.w ^= t[x0.x & 0xff]; x0.x >>= 8;
-	t += 256;
-
-	y0.x ^= t[x0.z & 0xff]; x0.z >>= 8;
-	y0.y ^= t[x0.w & 0xff]; x0.w >>= 8;
-	y0.z ^= t[x0.x & 0xff]; x0.x >>= 8;
-	y0.w ^= t[x0.y & 0xff]; x0.y >>= 8;
-
-	t += 256;
-
-	y0.x ^= t[x0.w];
-	y0.y ^= t[x0.x];
-	y0.z ^= t[x0.y];
-	y0.w ^= t[x0.z];
-
-	((uint128m*)s)[0] = _mm_xor_si128_emu(y0, key[0]);
-
-}
 
 uint128m _mm_cvtsi32_si128_emu(uint32_t lo)
 {
@@ -528,25 +486,25 @@ void case_0c(uint128m *prand, uint128m *prandex, const  uint128m *pbuf,
 }
 
 void case_10(uint128m *prand, uint128m *prandex, const  uint128m *pbuf,
-	uint64_t selector, uint128m *acc, uint128m *randomsource, uint32_t prand_idx, __local uint32_t *sharedMemory1)
+	uint64_t selector, uint128m *acc, __global uint128m *randomsource, uint32_t prand_idx, __local uint32_t *sharedMemory1)
 {			// a few AES operations
 	//uint128m rc[12];
 
 	//rc[0] = prand[0];
 
-	uint128m *rc = randomsource;
+	__global  uint128m *rc = &randomsource[prand_idx];
 
 	uint128m tmp, temp1 = _mm_load_si128_emu(pbuf - (((selector & 1) << 1) - 1));
 	uint128m temp2 = _mm_load_si128_emu(pbuf);
 
-	AES2_EMU_LOC(temp1, temp2, 0);
+	AES2_EMU(temp1, temp2, 0);
 	MIX2_EMU(temp1, temp2);
 
 
-	AES2_EMU_LOC(temp1, temp2, 4);
+	AES2_EMU(temp1, temp2, 4);
 	MIX2_EMU(temp1, temp2);
 
-	AES2_EMU_LOC(temp1, temp2, 8);
+	AES2_EMU(temp1, temp2, 8);
 	MIX2_EMU(temp1, temp2);
 
 
@@ -575,12 +533,10 @@ void case_14(uint128m *prand, uint128m *prandex, const  uint128m *pbuf,
 
 	uint64_t aesround = 0;
 	uint128m onekey, tmp;
-	uint64_t loop_c;
+	bool loop_c;
 
-	for (int i = 0; i<8; i++)
-	{
-		if (rounds <= 8) {
-			loop_c = selector & ((uint64_t)0x10000000 << rounds);
+	do {
+			loop_c = (selector & ((uint64_t)0x10000000 << rounds)) >> 28 ;
 			if (loop_c)
 			{
 				onekey = rc[0]; rc++; // _mm_load_si128_emu(rc++);
@@ -603,9 +559,7 @@ void case_14(uint128m *prand, uint128m *prandex, const  uint128m *pbuf,
 				acc[0] = _mm_xor_si128_emu(temp2, acc[0]);
 
 			}
-		}
-		(rounds--);
-	}
+	}while(rounds--);
 
 	 uint128m tempa1 = (prand[0]);
 	 uint128m tempa2 = _mm_mulhrs_epi16_emu(acc[0], tempa1);
@@ -630,9 +584,7 @@ void case_18(uint128m *prand, uint128m *prandex, const  uint128m *pbuf,
 	uint128m onekey;
 	uint64_t loop_c;
 
-	for (int i = 0; i<8; i++)
-	{
-		if (rounds <= 8) {
+	do {
 			loop_c = selector & ((uint64_t)0x10000000 << rounds);
 			if (loop_c)
 			{
@@ -655,9 +607,8 @@ void case_18(uint128m *prand, uint128m *prandex, const  uint128m *pbuf,
 				uint128m clprod2 = _mm_mulhrs_epi16_emu(acc[0], clprod1);
 				acc[0] = clprod2^ acc[0];
 			}
-		}
-		(rounds--);
-	}
+		}while(rounds--);
+	
 
 	const uint128m tempa3 = (prandex[0]);
 	const uint128m tempa4 = _mm_xor_si128_emu(tempa3, acc[0]);
@@ -690,26 +641,15 @@ void case_1c(uint128m *prand, uint128m *prandex, const  uint128m *pbuf,
 }
 
 
-#define m1 	rc[1] = randomsource[prand_idx + 1];\
-rc[2] = randomsource[prand_idx + 2];\
-rc[3] = randomsource[prand_idx + 3];\
-rc[4] = randomsource[prand_idx + 4];\
-rc[5] = randomsource[prand_idx + 5];\
-rc[6] = randomsource[prand_idx + 6];\
-rc[7] = randomsource[prand_idx + 7];\
-rc[8] = randomsource[prand_idx + 8];\
-rc[9] = randomsource[prand_idx + 9];\
-rc[10] = randomsource[prand_idx + 10];\
-rc[11] = randomsource[prand_idx + 11];\
-rc[0] = prand;
+
 
 #define m2 selector = _mm_cvtsi128_si64_emu(acc);\
-prand_idx = ((acc.x >> 5) & 511);\
+if(i > 0){prand_idx = ((acc.x >> 5) & 511);\
 prandex_idx = ((acc.y) & 511);\
 case_v = selector & 0x1cu;\
 prand = randomsource[prand_idx];\
 prandex = randomsource[prandex_idx];\
-pbuf = buf + (acc.x & 3);
+pbuf = buf + (acc.x & 3);}
 
 
 #define m3 	d_fix_r[i] = prand_idx;\
@@ -718,49 +658,48 @@ randomsource[prand_idx] = prand;\
 randomsource[prandex_idx] = prandex;\
 i++;
 
-#define C0 	if (case_v == 0 && i != 32)\
+#define C0 	if (case_v == 0 )\
 {case_0(&prand, &prandex, pbuf, selector, &acc);\
 	m3\
-		m2}
+	if(i==32)break;	m2}
 
-#define C1 	if (case_v == 4 && i != 32)\
+#define C1 	if (case_v == 4 )\
 {case_4(&prand, &prandex, pbuf, selector, &acc);\
    m3\
-   m2}
+  if(i==32)break; m2}
 
 
 
-#define C2		if (case_v == 8 && i != 32)\
+#define C2		if (case_v == 8 )\
 {case_8(&prand, &prandex, pbuf, selector, &acc);\
 	m3\
-		m2}\
+	if(i==32)break;	m2}\
 
-#define C3		if (case_v == 0xc && i != 32)\
+#define C3		if (case_v == 0xc )\
 {	case_0c(&prand, &prandex, pbuf, selector, &acc);\
 	m3\
-		m2}\
+	if(i==32)break;	m2}\
 
 
-#define C4  if (case_v == 0x10 && i != 32)\
-{	m1\
-		case_10(&prand, &prandex, pbuf, selector, &acc, rc, prand_idx, sharedMemory1);\
+#define C4  if (case_v == 0x10 )\
+{	case_10(&prand, &prandex, pbuf, selector, &acc, randomsource, prand_idx, sharedMemory1);\
 	m3\
-		m2}\
+	if(i==32)break;	m2}\
 
-#define C5 		 if (case_v == 0x14 && i != 32)\
+#define C5 		 if (case_v == 0x14 )\
 {	case_14(&prand, &prandex, pbuf, selector, &acc, randomsource, prand_idx, sharedMemory1);\
 	m3\
-		m2}\
+	if(i==32)break;	m2}\
 
-#define C6 		if (case_v == 0x18 && i != 32)\
+#define C6 		if (case_v == 0x18 )\
 {	case_18(&prand, &prandex, pbuf, selector, &acc, randomsource, prand_idx, sharedMemory1);\
 	m3\
-		m2}\
+	if(i==32)break;	m2}\
 
-#define C7 		if (case_v == 0x1C && i != 32)\
+#define C7 		if (case_v == 0x1C )\
 {	case_1c(&prand, &prandex, pbuf, selector, &acc);\
 	m3\
-		m2}\
+	if(i==32)break;	m2}\
 
 
 
@@ -793,7 +732,7 @@ uint128m __verusclmulwithoutreduction64alignedrepeatgpu(__global uint128m * rand
 		pbuf = buf + (acc.x & 3); 
 	do
 	{
-		uint128m rc[12];
+		
 		C5
 		C0
 		C1
@@ -814,28 +753,33 @@ uint128m __verusclmulwithoutreduction64alignedrepeatgpu(__global uint128m * rand
 
 uint32_t haraka512_port_keyed2222(const uint128m *in, __global uint128m *rc, __local uint32_t *sharedMemory1)
 {
-	uint128m s1, s2, s3, s4, tmp;
+	uint128m s0, s1, s2, s3, tmp;
 
-	s1 = in[0];
-	s2 = in[1];
-	s3 = in[2];
-	s4 = in[3];
+	s0 = in[0];
+	s1 = in[1];
+	s2 = in[2];
+	s3 = in[3];
 
-	AES4(s1, s2, s3, s4, 0);
-	MIX4(s1, s2, s3, s4);
+	AES4(s0, s1, s2, s3, 0);
+	MIX4(s0, s1, s2, s3);
 
-	AES4(s1, s2, s3, s4, 8);
-	MIX4(s1, s2, s3, s4);
+	AES4(s0, s1, s2, s3, 8);
+	MIX4(s0, s1, s2, s3);
 
-	AES4(s1, s2, s3, s4, 16);
-	MIX4(s1, s2, s3, s4);
+	AES4(s0, s1, s2, s3, 16);
+	MIX4(s0, s1, s2, s3);
 
-	AES4(s1, s2, s3, s4, 24);
-	MIX4_LASTBUT1(s1, s2, s3, s4);
+	AES4(s0, s1, s2, s3, 24);
 
-	AES4_LAST(s3, 32);
+	s2.x = s2.y;
+	s2.y = s0.y;
+	s2.z = s3.y;
+	s2.w = s1.y;
 
-	return s3.z ^ in[3].y;
+
+	AES4_LAST(s2, 32);
+
+	return s2.z ^ in[3].y;
 
 }
 
@@ -858,24 +802,24 @@ ulong precompReduction64(uint128m A) {
 	return _mm_cvtsi128_si64_emu(final);/// WARNING: HIGH 64 BITS SHOULD BE ASSUMED TO CONTAIN GARBAGE
 }
 
+//#define TOTAL_MAX (0xffff)
 
-__kernel __attribute__((reqd_work_group_size(64, 1, 1)))
+__kernel __attribute__((reqd_work_group_size(THREADS, 1, 1)))
 __kernel void verus_gpu_hash(__constant uint *startNonce,
-	__constant uint128m *blockhash_half, __global uint128m *data_keylarge, __global uint64_t *acc,
-	__global uint32_t *d_fix_r, __global uint32_t *d_fix_rex)
+	__constant uint128m *blockhash_half, __global uint128m *data_keylarge,constant uint128m * d_key_input, __global uint *target, __global uint *resNonce )
 {
-	uint thread = get_global_id(0);
+	const uint thread = get_global_id(0);
 	uint128m mid; 
 	uint128m s[4];
-	
-	__private uint lid = get_local_id(0);
-	uint nounce = startNonce[0] + thread;
+
+	const uint lid = get_local_id(0);
+	const uint nounce = startNonce[0] + thread;
 
 	__local  uint sharedMemory1[4][256];
 	__local  uint16_t sharedrand[THREADS * 32];
 	__local  uint16_t sharedrandex[THREADS * 32];
 
-	__global uint128m *pkey = &data_keylarge[0] + ((thread) * VERUS_KEY_SIZE128);
+	__global uint128m *pkey = &data_keylarge[0] + ((thread & TOTAL_MAX) * VERUS_KEY_SIZE128);
 
 	s[0] = blockhash_half[0];
 	s[1] = blockhash_half[1];
@@ -883,115 +827,57 @@ __kernel void verus_gpu_hash(__constant uint *startNonce,
 	s[3] = blockhash_half[3];
 
 
-	sharedMemory1[0][get_local_id(0)] = saes_table[0][get_local_id(0)];// copy sbox to shared mem
-	sharedMemory1[0][get_local_id(0) + 64] = saes_table[0][get_local_id(0) + 64];// copy sbox to shared mem
-	sharedMemory1[0][get_local_id(0) + 128] = saes_table[0][get_local_id(0) + 128];// copy sbox to shared mem
-	sharedMemory1[0][get_local_id(0) + 192] = saes_table[0][get_local_id(0) + 192];// copy sbox to shared mem
+	for (int i = get_local_id(0); i < 256; i += THREADS) {
 
-	sharedMemory1[1][get_local_id(0)] = saes_table[1][get_local_id(0)];// copy sbox to shared mem
-	sharedMemory1[1][get_local_id(0) + 64] = saes_table[1][get_local_id(0) + 64];// copy sbox to shared mem
-	sharedMemory1[1][get_local_id(0) + 128] = saes_table[1][get_local_id(0) + 128];// copy sbox to shared mem
-	sharedMemory1[1][get_local_id(0) + 192] = saes_table[1][get_local_id(0) + 192];// copy sbox to shared mem
-
-	sharedMemory1[2][get_local_id(0)] = saes_table[2][get_local_id(0)];// copy sbox to shared mem
-	sharedMemory1[2][get_local_id(0) + 64] = saes_table[2][get_local_id(0) + 64];// copy sbox to shared mem
-	sharedMemory1[2][get_local_id(0) + 128] = saes_table[2][get_local_id(0) + 128];// copy sbox to shared mem
-	sharedMemory1[2][get_local_id(0) + 192] = saes_table[2][get_local_id(0) + 192];// copy sbox to shared mem
-
-	sharedMemory1[3][get_local_id(0)] = saes_table[3][get_local_id(0)];// copy sbox to shared mem
-	sharedMemory1[3][get_local_id(0) + 64] = saes_table[3][get_local_id(0) + 64];// copy sbox to shared mem
-	sharedMemory1[3][get_local_id(0) + 128] = saes_table[3][get_local_id(0) + 128];// copy sbox to shared mem
-	sharedMemory1[3][get_local_id(0) + 192] = saes_table[3][get_local_id(0) + 192];// copy sbox to shared mem
-
+		sharedMemory1[0][i] = saes_table[0][i];
+		sharedMemory1[1][i] = saes_table[1][i];
+		sharedMemory1[2][i] = saes_table[2][i];
+		sharedMemory1[3][i] = saes_table[3][i];
+	}
 	barrier(CLK_LOCAL_MEM_FENCE); //sync sharedmem
-	((uint *)&s)[8] = nounce;
+	if (startNonce[0] == 0) {
+		for (int i = 0; i < VERUS_KEY_SIZE128; i++) {
 
-	mid = __verusclmulwithoutreduction64alignedrepeatgpu(pkey, s, sharedMemory1[0],
-		&sharedrand[lid *32], &sharedrandex[lid * 32]);
-	mid.x ^= 0x00010000;
-
-
-	acc[thread] = precompReduction64(mid);;
-	
-
-	for (int i = 0; i < 32; i++)
-	{
-		d_fix_r[(thread * 32) + i] = sharedrand[(lid * 32) + i];
-		d_fix_rex[(thread * 32) + i] = sharedrandex[(lid * 32) + i];
+			pkey[i] = d_key_input[i];
+		}
 	}
 
-};
+	s[2].x = nounce;
 
-__kernel __attribute__((reqd_work_group_size(256, 1, 1)))
-__kernel void verus_gpu_final(__constant uint *startNonce, __constant uint128m *blockhash_half, 
-	__global uint *target, __global uint *resNonce, __global uint128m *data_keylarge,
-	__global ulong *acc)
-{
-	uint thread = get_global_id(0);
-
-	uint hash; uint128m s[4];
-	ulong acc_loc = acc[thread];
-	uint nounce = startNonce[0] + thread;
-	__local  uint sharedMemory1[4][256];
-	__private uint lid = get_local_id(0);
-	__global uint128m *pkey = &data_keylarge[0] + ((thread)* VERUS_KEY_SIZE128);
-
+	mid = __verusclmulwithoutreduction64alignedrepeatgpu(pkey, s, sharedMemory1[0],&sharedrand[lid *32], &sharedrandex[lid * 32]);
+	mid.x ^= 0x00010000;
+	
 	s[0] = blockhash_half[0];
 	s[1] = blockhash_half[1];
-	s[2] = blockhash_half[2];
-	s[3] = blockhash_half[3];
-	sharedMemory1[0][get_local_id(0)] = saes_table[0][get_local_id(0)];// copy sbox to shared mem
+	//s[2] = blockhash_half[2];
+	//s[3] = blockhash_half[3];
 
-	sharedMemory1[1][get_local_id(0)] = saes_table[1][get_local_id(0)];// copy sbox to shared mem
+	uint2 acc2; ((ulong*)&acc2)[0] = precompReduction64(mid);
+	//s[2].x = nounce;	
+	((uint8_t*)&s)[47] = acc2.x & 0xff;
+	s[3].x = LIMMY_R(acc2.x, acc2.y, 8);
+	s[3].y = LIMMY_R(acc2.y, acc2.x, 8);
+	s[3].z = s[3].x ;
+	s[3].w = s[3].y ;
+	//s[3].z = LIMMY_R(acc2.x, acc2.y, 8);
+	//s[3].w = LIMMY_R(acc2.y, acc2.x, 8);
 
-	sharedMemory1[2][get_local_id(0)] = saes_table[2][get_local_id(0)];// copy sbox to shared mem
-
-
-	sharedMemory1[3][get_local_id(0)] = saes_table[3][get_local_id(0)];// copy sbox to shared mem
-
-	barrier(CLK_LOCAL_MEM_FENCE);
-
-	((uint*)&s)[8] = nounce;
-	memcpy(((uchar*)&s) + 47, (uchar*)&acc_loc, 8);
-	memcpy(((uchar*)&s) + 55, (uchar*)&acc_loc, 8);
-	memcpy(((uchar*)&s) + 63, (uchar*)&acc_loc, 1);
-
-	acc_loc &= 511;
-
-	hash = haraka512_port_keyed2222(s, &pkey[acc_loc], sharedMemory1[0]);
+	acc2.x  = acc2.x & 511;
+	
+	const	uint hash = haraka512_port_keyed2222(s, &pkey[acc2.x], sharedMemory1[0]);
 
 	if (hash < target[7]) {
 		resNonce[0] = nounce;
 	}
 
-	
-
-};
-
-__kernel __attribute__((reqd_work_group_size(128, 1, 1)))
-__kernel void verus_key(__constant uint128m * d_key_input, __global uint128m *data_keylarge)
-{
-
-	uint thread = get_local_id(0);
-	uint block = get_group_id(0);
-
-	data_keylarge[(block * VERUS_KEY_SIZE128) + thread] = d_key_input[thread];
-	data_keylarge[(block * VERUS_KEY_SIZE128) + thread + 128] = d_key_input[thread + 128];
-	data_keylarge[(block * VERUS_KEY_SIZE128) + thread + 256] = d_key_input[thread + 256];
-	data_keylarge[(block * VERUS_KEY_SIZE128) + thread + 384] = d_key_input[thread + 384];
-	if (thread < 40)
-		data_keylarge[(block * VERUS_KEY_SIZE128) + thread + 512] = d_key_input[thread + 512];
-
+	barrier(CLK_LOCAL_MEM_FENCE);
+	#pragma unroll 32
+	for (int i = 0; i < 32; i++)
+	{
+		pkey[sharedrand[(lid * 32) + i]] = d_key_input[sharedrand[(lid * 32) + i]];
+		pkey[sharedrandex[(lid * 32) + i]] = d_key_input[sharedrandex[(lid * 32) + i]];
+	}
+ //	mem_fence(CLK_LOCAL_MEM_FENCE);
 }
 
-__kernel __attribute__((reqd_work_group_size(32, 1, 1)))
-__kernel void verus_extra_gpu_fix(__constant uint128m *d_key_input, __global uint128m *data_keylarge,
-	__global uint32_t *d_fix_r, __global uint32_t *d_fix_rex)
-{
 
-	uint thread = get_local_id(0);
-	uint block = get_group_id(0);
-	data_keylarge[(block * VERUS_KEY_SIZE128) + d_fix_r[(block * 32) + thread]] = d_key_input[d_fix_r[(block * 32) + thread]];
-	data_keylarge[(block * VERUS_KEY_SIZE128) + d_fix_rex[(block * 32) + thread]] = d_key_input[d_fix_rex[(block * 32) + thread]];
-
-}

@@ -19,7 +19,6 @@
 #include <errno.h>
 #include <CL/cl.h>
 
-#include "sha256.h"
 
 #ifdef WIN32
 
@@ -65,7 +64,8 @@ typedef uint32_t	uint;
 #define MAX(A, B)	(((A) > (B)) ? (A) : (B))
 #define VERUS_KEY_SIZE 8832
 #define VERUS_KEY_SIZE128 552
-#define VERUS_WORKSIZE 0x20000
+#define VERUS_WORKSIZE 0x90000
+#define VERUS_PACKET 0x10000
 #define MAIN_THREADS 64
 
 static u128 *data_key = NULL;
@@ -77,8 +77,8 @@ uint64_t	nr_nonces = 1;
 uint32_t	do_list_devices = 0;
 uint32_t	gpu_to_use = 0;
 uint32_t	mining = 0;
-uint32_t    blocks = 1;
-uint32_t    gthreads = 256;
+uint32_t    blocks = VERUS_WORKSIZE;
+uint32_t    gthreads = MAIN_THREADS;
 struct timeval kern_avg_run_time;
 int amd_flag = 0;
 const char *source = NULL;
@@ -305,7 +305,7 @@ void get_program_build_log(cl_program program, cl_device_id device)
 
 	if (status == CL_SUCCESS)
 		fatal("clGetProgramBuildInfo (%d)\n", status);
-	printf( "%s\n", buffer);
+	printf("%s\n", buffer);
 
 }
 
@@ -387,469 +387,6 @@ void print_device_info(unsigned i, cl_device_id d)
 	fflush(stdout);
 }
 
-/////************VERUS2.0******************
-
-void clmul64(uint64_t a, uint64_t b, uint64_t* r)
-{
-	uint8_t s = 4, i; //window size
-	uint64_t two_s = 1 << s; //2^s
-	uint64_t smask = two_s - 1; //s 1 bits
-	uint64_t u[16];
-	uint64_t tmp;
-	uint64_t ifmask;
-	//Precomputation
-	u[0] = 0;
-	u[1] = b;
-	for (i = 2; i < two_s; i += 2) {
-		u[i] = u[i >> 1] << 1; //even indices: left shift
-		u[i + 1] = u[i] ^ b; //odd indices: xor b
-	}
-	//Multiply
-	r[0] = u[a & smask]; //first window only affects lower word
-	r[1] = 0;
-	for (i = s; i < 64; i += s) {
-		tmp = u[a >> i & smask];
-		r[0] ^= tmp << i;
-		r[1] ^= tmp >> (64 - i);
-	}
-	//Repair
-	uint64_t m = 0xEEEEEEEEEEEEEEEE; //s=4 => 16 times 1110
-	for (i = 1; i < s; i++) {
-		tmp = ((a & m) >> i);
-		m &= m << 1; //shift mask to exclude all bit j': j' mod s = i
-		ifmask = -((b >> (64 - i)) & 1); //if the (64-i)th bit of b is 1
-		r[1] ^= (tmp & ifmask);
-	}
-}
-
-u128 _mm_clmulepi64_si128_emu(const __m128i a, const __m128i b, int imm)
-{
-	uint64_t result[2];
-	clmul64(*((uint64_t*)&a + (imm & 1)), *((uint64_t*)&b + ((imm & 0x10) >> 4)), result);
-
-
-	return *(__m128i *)result;
-}
-
-u128 _mm_mulhrs_epi16_emu(__m128i _a, __m128i _b)
-{
-	int16_t result[8];
-	int16_t *a = (int16_t*)&_a, *b = (int16_t*)&_b;
-	for (int i = 0; i < 8; i++)
-	{
-		result[i] = (int16_t)((((int32_t)(a[i]) * (int32_t)(b[i])) + 0x4000) >> 15);
-	}
-
-	return *(__m128i *)result;
-}
-
-inline u128 _mm_set_epi64x_emu(uint64_t hi, uint64_t lo)
-{
-	__m128i result;
-	((uint64_t *)&result)[0] = lo;
-	((uint64_t *)&result)[1] = hi;
-	return result;
-}
-
-inline u128 _mm_cvtsi64_si128_emu(uint64_t lo)
-{
-	__m128i result;
-	((uint64_t *)&result)[0] = lo;
-	((uint64_t *)&result)[1] = 0;
-	return result;
-}
-
-inline int64_t _mm_cvtsi128_si64_emu(__m128i a)
-{
-	return *(int64_t *)&a;
-}
-
-inline int32_t _mm_cvtsi128_si32_emu(__m128i a)
-{
-	return *(int32_t *)&a;
-}
-
-inline u128 _mm_cvtsi32_si128_emu(uint32_t lo)
-{
-	__m128i result;
-	((uint32_t *)&result)[0] = lo;
-	((uint32_t *)&result)[1] = 0;
-	((uint64_t *)&result)[1] = 0;
-
-	return result;
-}
-
-typedef unsigned char u_char;
-
-u128 _mm_setr_epi8_emu(u_char c0, u_char c1, u_char c2, u_char c3, u_char c4, u_char c5, u_char c6, u_char c7, u_char c8, u_char c9, u_char c10, u_char c11, u_char c12, u_char c13, u_char c14, u_char c15)
-{
-	__m128i result;
-	((uint8_t *)&result)[0] = c0;
-	((uint8_t *)&result)[1] = c1;
-	((uint8_t *)&result)[2] = c2;
-	((uint8_t *)&result)[3] = c3;
-	((uint8_t *)&result)[4] = c4;
-	((uint8_t *)&result)[5] = c5;
-	((uint8_t *)&result)[6] = c6;
-	((uint8_t *)&result)[7] = c7;
-	((uint8_t *)&result)[8] = c8;
-	((uint8_t *)&result)[9] = c9;
-	((uint8_t *)&result)[10] = c10;
-	((uint8_t *)&result)[11] = c11;
-	((uint8_t *)&result)[12] = c12;
-	((uint8_t *)&result)[13] = c13;
-	((uint8_t *)&result)[14] = c14;
-	((uint8_t *)&result)[15] = c15;
-
-	return result;
-}
-
-inline __m128i _mm_srli_si128_emu(__m128i a, int imm8)
-{
-	unsigned char result[16];
-	uint8_t shift = imm8 & 0xff;
-	if (shift > 15) shift = 16;
-
-	int i;
-	for (i = 0; i < (16 - shift); i++)
-	{
-		result[i] = ((unsigned char *)&a)[shift + i];
-	}
-	for (; i < 16; i++)
-	{
-		result[i] = 0;
-	}
-
-	return *(__m128i *)result;
-}
-
-inline __m128i _mm_xor_si128_emu(__m128i a, __m128i b)
-{
-#ifdef _WIN32
-	uint64_t result[2];
-	result[0] = *(uint64_t *)&a ^ *(uint64_t *)&b;
-	result[1] = *((uint64_t *)&a + 1) ^ *((uint64_t *)&b + 1);
-	return *(__m128i *)result;
-#else
-	return a ^ b;
-#endif
-}
-
-inline __m128i _mm_load_si128_emu(const void *p)
-{
-	return *(__m128i *)p;
-}
-
-inline void _mm_store_si128_emu(void *p, __m128i val)
-{
-	*(__m128i *)p = val;
-}
-
-__m128i _mm_shuffle_epi8_emu(__m128i a, __m128i b)
-{
-	__m128i result;
-	for (int i = 0; i < 16; i++)
-	{
-		if (((uint8_t *)&b)[i] & 0x80)
-		{
-			((uint8_t *)&result)[i] = 0;
-		}
-		else
-		{
-			((uint8_t *)&result)[i] = ((uint8_t *)&a)[((uint8_t *)&b)[i] & 0xf];
-		}
-	}
-
-
-	return result;
-}
-
-// portable
-static inline __m128i lazyLengthHash_port(uint64_t keylength, uint64_t length) {
-	const __m128i lengthvector = _mm_set_epi64x_emu(keylength, length);
-	const __m128i clprod1 = _mm_clmulepi64_si128_emu(lengthvector, lengthvector, 0x10);
-	return clprod1;
-}
-
-// modulo reduction to 64-bit value. The high 64 bits contain garbage, see precompReduction64
-static inline __m128i precompReduction64_si128_port(__m128i A) {
-
-	//const __m128i C = _mm_set_epi64x(1U,(1U<<4)+(1U<<3)+(1U<<1)+(1U<<0)); // C is the irreducible poly. (64,4,3,1,0)
-	const __m128i C = _mm_cvtsi64_si128_emu((1U << 4) + (1U << 3) + (1U << 1) + (1U << 0));
-	__m128i Q2 = _mm_clmulepi64_si128_emu(A, C, 0x01);
-	__m128i Q3 = _mm_shuffle_epi8_emu(_mm_setr_epi8_emu(0, 27, 54, 45, 108, 119, 90, 65, (char)216, (char)195, (char)238, (char)245, (char)180, (char)175, (char)130, (char)153),
-		_mm_srli_si128_emu(Q2, 8));
-	__m128i Q4 = _mm_xor_si128_emu(Q2, A);
-	const __m128i final = _mm_xor_si128_emu(Q3, Q4);
-	return final;/// WARNING: HIGH 64 BITS SHOULD BE ASSUMED TO CONTAIN GARBAGE
-}
-
-static inline uint64_t precompReduction64_port(__m128i A) {
-	__m128i tmp = precompReduction64_si128_port(A);
-	return _mm_cvtsi128_si64_emu(tmp);
-}
-
-// verus intermediate hash extra
-static __m128i __verusclmulwithoutreduction64alignedrepeat_port(__m128i *randomsource, const __m128i buf[4], uint64_t keyMask)
-{
-	__m128i const *pbuf;
-
-	keyMask >>= 4;
-
-	__m128i acc = _mm_load_si128_emu(randomsource + (keyMask + 2));
-
-	for (int64_t i = 0; i < 32; i++)
-	{
-		//std::cout << "LOOP " << i << " acc: " << LEToHex(acc) << std::endl;
-
-		const uint64_t selector = _mm_cvtsi128_si64_emu(acc);
-
-		// get two random locations in the key, which will be mutated and swapped
-		__m128i *prand = randomsource + ((selector >> 5) & keyMask);
-		__m128i *prandex = randomsource + ((selector >> 32) & keyMask);
-
-
-
-		// select random start and order of pbuf processing
-		pbuf = buf + (selector & 3);
-
-		switch (selector & 0x1c)
-		{
-		case 0:
-		{
-			const __m128i temp1 = _mm_load_si128_emu(prandex);
-			const __m128i temp2 = _mm_load_si128_emu(pbuf - (((selector & 1) << 1) - 1));
-			const __m128i add1 = _mm_xor_si128_emu(temp1, temp2);
-			const __m128i clprod1 = _mm_clmulepi64_si128_emu(add1, add1, 0x10);
-			acc = _mm_xor_si128_emu(clprod1, acc);
-
-			const __m128i tempa1 = _mm_mulhrs_epi16_emu(acc, temp1);
-			const __m128i tempa2 = _mm_xor_si128_emu(tempa1, temp1);
-
-			const __m128i temp12 = _mm_load_si128_emu(prand);
-			_mm_store_si128_emu(prand, tempa2);
-
-			const __m128i temp22 = _mm_load_si128_emu(pbuf);
-			const __m128i add12 = _mm_xor_si128_emu(temp12, temp22);
-			const __m128i clprod12 = _mm_clmulepi64_si128_emu(add12, add12, 0x10);
-			acc = _mm_xor_si128_emu(clprod12, acc);
-
-			const __m128i tempb1 = _mm_mulhrs_epi16_emu(acc, temp12);
-			const __m128i tempb2 = _mm_xor_si128_emu(tempb1, temp12);
-			_mm_store_si128_emu(prandex, tempb2);
-			break;
-		}
-		case 4:
-		{
-			const __m128i temp1 = _mm_load_si128_emu(prand);
-			const __m128i temp2 = _mm_load_si128_emu(pbuf);
-			const __m128i add1 = _mm_xor_si128_emu(temp1, temp2);
-			const __m128i clprod1 = _mm_clmulepi64_si128_emu(add1, add1, 0x10);
-			acc = _mm_xor_si128_emu(clprod1, acc);
-			const __m128i clprod2 = _mm_clmulepi64_si128_emu(temp2, temp2, 0x10);
-			acc = _mm_xor_si128_emu(clprod2, acc);
-
-			const __m128i tempa1 = _mm_mulhrs_epi16_emu(acc, temp1);
-			const __m128i tempa2 = _mm_xor_si128_emu(tempa1, temp1);
-
-			const __m128i temp12 = _mm_load_si128_emu(prandex);
-			_mm_store_si128_emu(prandex, tempa2);
-
-			const __m128i temp22 = _mm_load_si128_emu(pbuf - (((selector & 1) << 1) - 1));
-			const __m128i add12 = _mm_xor_si128_emu(temp12, temp22);
-			acc = _mm_xor_si128_emu(add12, acc);
-
-			const __m128i tempb1 = _mm_mulhrs_epi16_emu(acc, temp12);
-			const __m128i tempb2 = _mm_xor_si128_emu(tempb1, temp12);
-			_mm_store_si128_emu(prand, tempb2);
-			break;
-		}
-		case 8:
-		{
-			const __m128i temp1 = _mm_load_si128_emu(prandex);
-			const __m128i temp2 = _mm_load_si128_emu(pbuf);
-			const __m128i add1 = _mm_xor_si128_emu(temp1, temp2);
-			acc = _mm_xor_si128_emu(add1, acc);
-
-			const __m128i tempa1 = _mm_mulhrs_epi16_emu(acc, temp1);
-			const __m128i tempa2 = _mm_xor_si128_emu(tempa1, temp1);
-
-			const __m128i temp12 = _mm_load_si128_emu(prand);
-			_mm_store_si128_emu(prand, tempa2);
-
-			const __m128i temp22 = _mm_load_si128_emu(pbuf - (((selector & 1) << 1) - 1));
-			const __m128i add12 = _mm_xor_si128_emu(temp12, temp22);
-			const __m128i clprod12 = _mm_clmulepi64_si128_emu(add12, add12, 0x10);
-			acc = _mm_xor_si128_emu(clprod12, acc);
-			const __m128i clprod22 = _mm_clmulepi64_si128_emu(temp22, temp22, 0x10);
-			acc = _mm_xor_si128_emu(clprod22, acc);
-
-			const __m128i tempb1 = _mm_mulhrs_epi16_emu(acc, temp12);
-			const __m128i tempb2 = _mm_xor_si128_emu(tempb1, temp12);
-			_mm_store_si128_emu(prandex, tempb2);
-			break;
-		}
-		case 0xc:
-		{
-			const __m128i temp1 = _mm_load_si128_emu(prand);
-			const __m128i temp2 = _mm_load_si128_emu(pbuf - (((selector & 1) << 1) - 1));
-			const __m128i add1 = _mm_xor_si128_emu(temp1, temp2);
-
-			// cannot be zero here
-			const int32_t divisor = (uint32_t)selector;
-
-			acc = _mm_xor_si128_emu(add1, acc);
-
-			const int64_t dividend = _mm_cvtsi128_si64_emu(acc);
-			const __m128i modulo = _mm_cvtsi32_si128_emu(dividend % divisor);
-			acc = _mm_xor_si128_emu(modulo, acc);
-
-			const __m128i tempa1 = _mm_mulhrs_epi16_emu(acc, temp1);
-			const __m128i tempa2 = _mm_xor_si128_emu(tempa1, temp1);
-
-			if (dividend & 1)
-			{
-				const __m128i temp12 = _mm_load_si128_emu(prandex);
-				_mm_store_si128_emu(prandex, tempa2);
-
-				const __m128i temp22 = _mm_load_si128_emu(pbuf);
-				const __m128i add12 = _mm_xor_si128_emu(temp12, temp22);
-				const __m128i clprod12 = _mm_clmulepi64_si128_emu(add12, add12, 0x10);
-				acc = _mm_xor_si128_emu(clprod12, acc);
-				const __m128i clprod22 = _mm_clmulepi64_si128_emu(temp22, temp22, 0x10);
-				acc = _mm_xor_si128_emu(clprod22, acc);
-
-				const __m128i tempb1 = _mm_mulhrs_epi16_emu(acc, temp12);
-				const __m128i tempb2 = _mm_xor_si128_emu(tempb1, temp12);
-				_mm_store_si128_emu(prand, tempb2);
-			}
-			else
-			{
-				const __m128i tempb3 = _mm_load_si128_emu(prandex);
-				_mm_store_si128_emu(prandex, tempa2);
-				_mm_store_si128_emu(prand, tempb3);
-			}
-			break;
-		}
-		case 0x10:
-		{
-			// a few AES operations
-			const __m128i *rc = prand;
-			__m128i tmp;
-
-			__m128i temp1 = _mm_load_si128_emu(pbuf - (((selector & 1) << 1) - 1));
-			__m128i temp2 = _mm_load_si128_emu(pbuf);
-
-			AES2_EMU(temp1, temp2, 0);
-			MIX2_EMU(temp1, temp2);
-
-			AES2_EMU(temp1, temp2, 4);
-			MIX2_EMU(temp1, temp2);
-
-			AES2_EMU(temp1, temp2, 8);
-			MIX2_EMU(temp1, temp2);
-
-			acc = _mm_xor_si128_emu(temp1, acc);
-			acc = _mm_xor_si128_emu(temp2, acc);
-
-			const __m128i tempa1 = _mm_load_si128_emu(prand);
-			const __m128i tempa2 = _mm_mulhrs_epi16_emu(acc, tempa1);
-			const __m128i tempa3 = _mm_xor_si128_emu(tempa1, tempa2);
-
-			const __m128i tempa4 = _mm_load_si128_emu(prandex);
-			_mm_store_si128_emu(prandex, tempa3);
-			_mm_store_si128_emu(prand, tempa4);
-			break;
-		}
-		case 0x14:
-		{
-			// we'll just call this one the monkins loop, inspired by Chris
-			const __m128i *buftmp = pbuf - (((selector & 1) << 1) - 1);
-			__m128i tmp; // used by MIX2
-
-			uint64_t rounds = selector >> 61; // loop randomly between 1 and 8 times
-			__m128i *rc = prand;
-			uint64_t aesround = 0;
-			__m128i onekey;
-
-			do
-			{
-				//std::cout << "acc: " << LEToHex(acc) << ", round check: " << LEToHex((selector & (0x10000000 << rounds))) << std::endl;
-
-				// note that due to compiler and CPUs, we expect this to do:
-				// if (selector & ((0x10000000 << rounds) & 0xffffffff) if rounds != 3 else selector & 0xffffffff80000000):
-				if (selector & (0x10000000 << rounds))
-				{
-					onekey = _mm_load_si128_emu(rc++);
-					const __m128i temp2 = _mm_load_si128_emu(rounds & 1 ? pbuf : buftmp);
-					const __m128i add1 = _mm_xor_si128_emu(onekey, temp2);
-					const __m128i clprod1 = _mm_clmulepi64_si128_emu(add1, add1, 0x10);
-					acc = _mm_xor_si128_emu(clprod1, acc);
-				}
-				else
-				{
-					onekey = _mm_load_si128_emu(rc++);
-					__m128i temp2 = _mm_load_si128_emu(rounds & 1 ? buftmp : pbuf);
-					const uint64_t roundidx = aesround++ << 2;
-					AES2_EMU(onekey, temp2, roundidx);
-
-					MIX2_EMU(onekey, temp2);
-
-					acc = _mm_xor_si128_emu(onekey, acc);
-					acc = _mm_xor_si128_emu(temp2, acc);
-				}
-			} while (rounds--);
-
-			const __m128i tempa1 = _mm_load_si128_emu(prand);
-			const __m128i tempa2 = _mm_mulhrs_epi16_emu(acc, tempa1);
-			const __m128i tempa3 = _mm_xor_si128_emu(tempa1, tempa2);
-
-			const __m128i tempa4 = _mm_load_si128_emu(prandex);
-			_mm_store_si128_emu(prandex, tempa3);
-			_mm_store_si128_emu(prand, tempa4);
-			break;
-		}
-		case 0x18:
-		{
-			const __m128i temp1 = _mm_load_si128_emu(pbuf - (((selector & 1) << 1) - 1));
-			const __m128i temp2 = _mm_load_si128_emu(prand);
-			const __m128i add1 = _mm_xor_si128_emu(temp1, temp2);
-			const __m128i clprod1 = _mm_clmulepi64_si128_emu(add1, add1, 0x10);
-			acc = _mm_xor_si128_emu(clprod1, acc);
-
-			const __m128i tempa1 = _mm_mulhrs_epi16_emu(acc, temp2);
-			const __m128i tempa2 = _mm_xor_si128_emu(tempa1, temp2);
-
-			const __m128i tempb3 = _mm_load_si128_emu(prandex);
-			_mm_store_si128_emu(prandex, tempa2);
-			_mm_store_si128_emu(prand, tempb3);
-			break;
-		}
-		case 0x1c:
-		{
-			const __m128i temp1 = _mm_load_si128_emu(pbuf);
-			const __m128i temp2 = _mm_load_si128_emu(prandex);
-			const __m128i add1 = _mm_xor_si128_emu(temp1, temp2);
-			const __m128i clprod1 = _mm_clmulepi64_si128_emu(add1, add1, 0x10);
-			acc = _mm_xor_si128_emu(clprod1, acc);
-
-			const __m128i tempa1 = _mm_mulhrs_epi16_emu(acc, temp2);
-			const __m128i tempa2 = _mm_xor_si128_emu(tempa1, temp2);
-
-			const __m128i tempa3 = _mm_load_si128_emu(prand);
-			_mm_store_si128_emu(prand, tempa2);
-
-			acc = _mm_xor_si128_emu(tempa3, acc);
-
-			const __m128i tempb1 = _mm_mulhrs_epi16_emu(acc, tempa3);
-			const __m128i tempb2 = _mm_xor_si128_emu(tempb1, tempa3);
-			_mm_store_si128_emu(prandex, tempb2);
-			break;
-		}
-		}
-	}
-	return acc;
-}
 
 
 
@@ -873,17 +410,6 @@ void GenNewCLKey(unsigned char *seedBytes32, u128 *keyback)
 		haraka256_port(buf, psrc);
 		memcpy(pkey, buf, nbytesExtra);
 	}
-}
-
-
-uint64_t verusclhash_port(void * random, const unsigned char buf[64], uint64_t keyMask) {
-	const unsigned int  m = 128;// we process the data in chunks of 16 cache lines
-	__m128i * rs64 = (__m128i *)random;
-	const __m128i * string = (const __m128i *) buf;
-
-	__m128i  acc = __verusclmulwithoutreduction64alignedrepeat_port(rs64, string, keyMask);
-	acc = _mm_xor_si128_emu(acc, lazyLengthHash_port(1024, 64));
-	return precompReduction64_port(acc);
 }
 
 
@@ -982,20 +508,6 @@ int32_t cmp_target_256(void *_a, void *_b)
 	return 0;
 }
 
-void Verus2hash(unsigned char *hash, unsigned char *curBuf, uint32_t nonce)
-{
-	uint64_t mask = VERUS_KEY_SIZE128; //552
-
-									   //	GenNewCLKey(curBuf, data_key[thr_id]);  //data_key a global static 2D array data_key[16][8832];
-	((uint32_t*)&curBuf[0])[8] = nonce;
-	uint64_t intermediate = verusclhash_port(data_key, curBuf, VERUS_KEY_SIZE);
-	//FillExtra
-	memcpy(curBuf + 47, &intermediate, 8);
-	memcpy(curBuf + 55, &intermediate, 8);
-	memcpy(curBuf + 63, &intermediate, 1);
-
-	haraka512_port_keyed(hash, curBuf, data_key + (intermediate & mask));
-}
 
 /*
 ** Verify if the solution's block hash is under the target, and if yes print
@@ -1004,39 +516,7 @@ void Verus2hash(unsigned char *hash, unsigned char *curBuf, uint32_t nonce)
 **
 ** Return 1 iff the block hash is under the target.
 */
-uint32_t print_solver_line(uint32_t *values, uint8_t *header,
-	size_t fixed_nonce_bytes, uint8_t *target, char *job_id)
-{
-	uint8_t	buffer[ZCASH_BLOCK_HEADER_LEN + ZCASH_SOLSIZE_LEN +
-		ZCASH_SOL_LEN];
-	uint8_t	hash0[SHA256_DIGEST_SIZE];
-	uint8_t	hash1[SHA256_DIGEST_SIZE];
-	uint8_t	*p;
-	p = buffer;
-	memcpy(p, header, ZCASH_BLOCK_HEADER_LEN);
-	p += ZCASH_BLOCK_HEADER_LEN;
-	memcpy(p, "\xfd\x40\x05", ZCASH_SOLSIZE_LEN);
-	p += ZCASH_SOLSIZE_LEN;
-	store_encoded_sol(p, values, 1 << PARAM_K);
 
-	// compare the double SHA256 hash with the target
-	if (cmp_target_256(target, hash1) < 0)
-	{
-		debug("Hash is above target\n");
-		return 0;
-	}
-	debug("Hash is under target\n");
-	printf("sol: %s ", job_id);
-	p = header + ZCASH_BLOCK_OFFSET_NTIME;
-	printf("%02x%02x%02x%02x ", p[0], p[1], p[2], p[3]);
-	printf("%s ", s_hexdump(header + ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN +
-		fixed_nonce_bytes, ZCASH_NONCE_LEN - fixed_nonce_bytes));
-	printf("%s%s\n", ZCASH_SOLSIZE_HEX,
-		s_hexdump(buffer + ZCASH_BLOCK_HEADER_LEN + ZCASH_SOLSIZE_LEN,
-			ZCASH_SOL_LEN));
-	fflush(stdout);
-	return 1;
-}
 
 int sol_cmp(const void *_a, const void *_b)
 {
@@ -1058,44 +538,7 @@ int sol_cmp(const void *_a, const void *_b)
 ** In mining mode, return the number of shares, that is the number of solutions
 ** that were under the target.
 */
-uint32_t print_sols(sols_t *all_sols, uint64_t *nonce, uint32_t nr_valid_sols,
-	uint8_t *header, size_t fixed_nonce_bytes, uint8_t *target,
-	char *job_id)
-{
-	uint8_t		*valid_sols;
-	uint32_t		counted;
-	uint32_t		shares = 0;
-	valid_sols = malloc(nr_valid_sols * SOL_SIZE);
-	if (!valid_sols)
-		fatal("malloc: %s\n", strerror(errno));
-	counted = 0;
-	for (uint32_t i = 0; i < all_sols->nr; i++)
-		if (all_sols->valid[i])
-		{
-			if (counted >= nr_valid_sols)
-				fatal("Bug: more than %d solutions\n", nr_valid_sols);
-			memcpy(valid_sols + counted * SOL_SIZE, all_sols->values[i],
-				SOL_SIZE);
-			counted++;
-		}
-	assert(counted == nr_valid_sols);
-	// sort the solutions amongst each other, to make the solver's output
-	// deterministic and testable
-	qsort(valid_sols, nr_valid_sols, SOL_SIZE, sol_cmp);
-	for (uint32_t i = 0; i < nr_valid_sols; i++)
-	{
-		uint32_t	*inputs = (uint32_t *)(valid_sols + i * SOL_SIZE);
-		if (!mining && show_encoded)
-			print_encoded_sol(inputs, 1 << PARAM_K);
-		if (verbose)
-			print_sol(inputs, nonce);
-		if (mining)
-			shares += print_solver_line(inputs, header, fixed_nonce_bytes,
-				target, job_id);
-	}
-	free(valid_sols);
-	return shares;
-}
+
 
 /*
 ** Sort a pair of binary blobs (a, b) which are consecutive in memory and
@@ -1210,17 +653,16 @@ uint32_t verify_nonce(cl_command_queue queue, cl_mem nonces_d,
 	winning_n = pnonce[0];
 
 	if (winning_n != 0xfffffffful)
+
 	{
 		uint32_t vhash[8];
-		Verus2hash((unsigned char *)vhash, (unsigned char *)verus, winning_n);
-	//	printf("GPU hash end= %08x\n", vhash[7]);
-	//	  printf("(nonce=%08x)\n",winning_n);
-		  fflush(stdout);
+		//	Verus2hash((unsigned char *)vhash, (unsigned char *)verus, winning_n);
+		//	printf("GPU hash end= %08x\n", vhash[7]);
 		const uint32_t Htarg = ((uint32_t*)&target[0])[7];
 
-		if (vhash[7] >= Htarg || fulltest(vhash, (uint32_t*)target)){
+		if (vhash[7] >= Htarg || fulltest(vhash, (uint32_t*)target)) {
 			((uint32_t*)&buffer)[333] = winning_n & 0xffffffff;
-		//	((uint32_t*)&buffer)[334] = winning_n >> 32;
+			//	((uint32_t*)&buffer)[334] = winning_n >> 32;
 			buffer[0] = 0xfd; buffer[1] = 0x40; buffer[2] = 0x05; buffer[3] = 0x03;
 			sh = 1;
 
@@ -1335,11 +777,11 @@ int read_last_line(char *buf, size_t len, int block)
 		DWORD bytesAvailable = 0;
 		HANDLE stdinHandle = GetStdHandle(STD_INPUT_HANDLE);
 		PeekNamedPipe(stdinHandle, NULL, 0, NULL, &bytesAvailable, NULL);
-		
+
 		if (bytesAvailable > 0) {
 
 			if (!ReadFile(stdinHandle, buf, bytesAvailable, &bytesAvailable, NULL)) {
-				
+
 				fatal("ReadFile: %d", GetLastError());
 			}
 			pos += bytesAvailable;
@@ -1429,15 +871,16 @@ void mining_parse_job(char *str, uint8_t *target, size_t target_len,
 /*
 ** Run in mining mode.
 */
-#ifdef WIN32
+
 
 #ifndef DEFAULT_NUM_MINING_MODE_THREADS
 #define DEFAULT_NUM_MINING_MODE_THREADS 1
 #define MAX_NUM_MINING_MODE_THREADS 16
 #endif
 uint32_t num_mining_mode_threads = DEFAULT_NUM_MINING_MODE_THREADS;
+#ifdef WIN32
 CRITICAL_SECTION cs;
-
+#endif
 struct mining_mode_thread_args {
 	cl_device_id dev_id;
 	cl_context ctx;
@@ -1445,7 +888,7 @@ struct mining_mode_thread_args {
 
 	//
 	uint8_t     header[ZCASH_BLOCK_HEADER_LEN];
-	uint8_t		target[SHA256_DIGEST_SIZE];
+	uint8_t		target[32];
 	char		job_id[256];
 	size_t		fixed_nonce_bytes;
 	uint64_t		*total;
@@ -1460,7 +903,7 @@ void mining_mode(cl_device_id dev_id, cl_program program, cl_context ctx, cl_com
 {
 
 	char		line[4096];
-	uint8_t		target[SHA256_DIGEST_SIZE];
+	uint8_t		target[32];
 	char		job_id[256];
 	size_t		fixed_nonce_bytes = 0;
 	uint64_t		i;
@@ -1473,7 +916,7 @@ void mining_mode(cl_device_id dev_id, cl_program program, cl_context ctx, cl_com
 	uint8_t         *blockhash_half; // [64] = { 0 };
 	uint8_t         *ptarget;
 	uint32_t		*pnonces;
-	cl_mem          key_const_d, data_keylarge_d, verushead_d, target_d, nonces_d, startNonce_d;
+	cl_mem          key_const_d, data_keylarge_d, blockhash_half_d, target_d, resnonces_d, startNonce_d;
 	size_t		    global_ws;
 	size_t          local_work_size = 256;
 	uint32_t		nonces_total = 0;
@@ -1493,209 +936,22 @@ void mining_mode(cl_device_id dev_id, cl_program program, cl_context ctx, cl_com
 	uint32_t num_sols;
 
 	key_const_d = check_clCreateBuffer(ctx, CL_MEM_READ_ONLY, sizeof(uint8_t) * VERUS_KEY_SIZE, NULL);
-	verushead_d = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(uint8_t) * 64, NULL);
-	target_d = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(uint8_t) * 32, NULL);
-	nonces_d = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(uint32_t) * 2, NULL);
-	startNonce_d = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(uint32_t) * 2, NULL);
-	data_keylarge_d = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(uint8_t) * 1, NULL);
-
-	nonce_ptr = (uint64_t *)(header + ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN);
-
-	InitializeCriticalSection(&cs);
-
-	puts("SILENTARMY mining mode ready");
-	fflush(stdout);
-	SetConsoleOutputCP(65001);
-	
-	while (1)
-	{
-		// iteration #0 always reads a job or else there is nothing to do
-
-		nonce_sum[0] = 0;
-		if (read_last_line(line, sizeof(line), !i)) {
-
-			EnterCriticalSection(&cs);
-			mining_parse_job(line,
-				target, sizeof(target),
-				job_id, sizeof(job_id),
-				header, ZCASH_BLOCK_HEADER_LEN,
-				&fixed_nonce_bytes);
-			LeaveCriticalSection(&cs);
-	
-			memcpy(full_data, header, 140);
-			memcpy(sol_data, block_41970, 4);
-			//memcpy(full_data, data, 1487);
-
-			VerusHashHalf(blockhash_half, (unsigned char*)full_data, 1487);
-
-		//	printf("[CPU]blockhash_half ito verusclmulithout        : ");
-			//for (int i = 0; i < 64; i++)
-		//		printf("%02x", blockhash_half[i]);
-		//	printf("\n");
-
-
-			GenNewCLKey((unsigned char*)blockhash_half, data_key);  
-		//	printf("[CPU]datakey       : ");
-		//	for (int e = 0; e < 64; e++)
-		//		printf("%02x", ((uint8_t*)&data_key[0])[e]);
-		//	printf("\n");
-
-			for (int j = 0; j < 32; j++)
-				ptarget[j] = target[j];
-
-			pnonces[0] = 0xfffffffful;
-			nonce_sum[0] = 0x0ul;
-		// send header,key,target to GPU verus_setBlock(blockhash_half, target, (uint8_t*)data_key, throughput); //set data to gpu kernel
-		
-		}
-		else if (nonce_sum[0] == 0)  //main nonce needs incrementing
-		{
-			
-			// increment bytes 17-19
-			(*(uint32_t *)((uint8_t *)nonce_ptr + 17))++;
-			// byte 20 and above must be zero
-			*(uint32_t *)((uint8_t *)nonce_ptr + 20) = 0;
-
-			memcpy(full_data, header, 140);
-			memcpy(sol_data, block_41970, 4);
-			//memcpy(full_data, header, 1487);
-
-			VerusHashHalf(blockhash_half, (unsigned char*)full_data, 1487);
-			
-		//	printf("[CPU]blockhash_half ito verusclmulithout        : ");
-		//	for (int i = 0; i < 64; i++)
-		//		printf("%02x", blockhash_half[i]);
-		//	printf("\n");
-			
-			GenNewCLKey((unsigned char*)blockhash_half, data_key);
-
-		//	printf("[CPU]datakey       : ");
-		//	for (int e = 0; e < 64; e++)
-		//		printf("%02x", ((uint8_t*)&data_key[0])[e]);
-		//	printf("\n");
-
-			for (int j = 0; j < 32; j++)
-				ptarget[j] = target[j];
-
-			
-			// send header,key,target to GPU verus_setBlock(blockhash_half, target, (uint8_t*)data_key, throughput); //set data to gpu kernel
-
-
-		}
-		
-			pnonces[0] = 0xfffffffful;
-			status = clEnqueueWriteBuffer(queue, verushead_d, CL_TRUE, 0, sizeof(uint8_t) * 64, blockhash_half, 0, NULL, NULL);
-			if (status != CL_SUCCESS)printf("clEnqueueWriteBuffer (%d)\n", status);
-			status = clEnqueueWriteBuffer(queue, target_d, CL_TRUE, 0, sizeof(uint8_t) * 32, ptarget, 0, NULL, NULL);
-			if (status != CL_SUCCESS)printf("clEnqueueWriteBuffer (%d)\n", status);
-			status = clEnqueueWriteBuffer(queue, key_const_d, CL_TRUE, 0, sizeof(uint8_t) * VERUS_KEY_SIZE, data_key, 0, NULL, NULL);
-			if (status != CL_SUCCESS)printf("clEnqueueWriteBuffer (%d)\n", status);
-			status = clEnqueueWriteBuffer(queue, nonces_d, CL_TRUE, 0, sizeof(uint32_t) * 1, pnonces, 0, NULL, NULL);
-			if (status != CL_SUCCESS)printf("clEnqueueWriteBuffer (%d)\n", status);
-			status = clEnqueueWriteBuffer(queue, startNonce_d, CL_TRUE, 0, sizeof(uint32_t) * 1, nonce_sum, 0, NULL, NULL);
-			if (status != CL_SUCCESS)printf("clEnqueueWriteBuffer (%d)\n", status);
-			
-			
-			check_clSetKernelArg(k_verus[0], 0, &startNonce_d);
-			check_clSetKernelArg(k_verus[0], 1, &key_const_d);
-			check_clSetKernelArg(k_verus[0], 2, &verushead_d);
-			check_clSetKernelArg(k_verus[0], 3, &nonces_d);
-			check_clSetKernelArg(k_verus[0], 4, &target_d);
-			check_clSetKernelArg(k_verus[0], 5, &data_keylarge_d);
-			
-			global_ws = VERUS_WORKSIZE;
-			local_work_size = MAIN_THREADS;
-				
-			check_clEnqueueNDRangeKernel(queue, k_verus[0], 1, NULL,
-				&global_ws, &local_work_size, 0, NULL, NULL);
-			clFinish(queue);
-		
-			num_sols = verify_nonce(queue, nonces_d, header,
-				fixed_nonce_bytes, target, job_id, shares, blockhash_half, pnonces);
-		
-
-			total += VERUS_WORKSIZE;
-			total_shares += num_sols;
-			if ((nonce_sum[0] + VERUS_WORKSIZE )< 0xfffffffful)
-				nonce_sum[0] += (uint64_t)global_ws;
-			else
-				nonce_sum[0] = 0;
-
-
-		if ((t1 = now()) > t0 + status_period)
-		{
-
-			EnterCriticalSection(&cs);
-			t0 = t1;
-
-			printf("status: %" PRId64 " %" PRId64 "\n", total / 1000000, total_shares);
-			fflush(stdout);
-			LeaveCriticalSection(&cs);
-			//fprintf(stderr, " (%d kh/s)\n",
-			//	(t3 - t2) / 1e3, total / ((t3 - t2) / 1e6) / 1000);
-			//fflush(stdout);
-		}
-
-	}
-
-
-
-}
-#else
-void mining_mode(cl_device_id dev_id, cl_program program, cl_context ctx, cl_command_queue queue,
-	cl_kernel *k_verus, uint8_t *header)
-{
-
-	char		line[4096];
-	uint8_t		target[SHA256_DIGEST_SIZE];
-	char		job_id[256];
-	size_t		fixed_nonce_bytes = 0;
-	uint64_t		i;
-	uint64_t		total = 0;
-	uint32_t		shares;
-	uint64_t		total_shares = 0;
-	uint64_t		t0 = 0, t1;
-	uint64_t		status_period = 300e3; // time (usec) between statuses
-	cl_int          status;
-	uint8_t         *blockhash_half; // [64] = { 0 };
-	uint8_t         *ptarget;
-	uint32_t		*pnonces;
-	cl_mem          key_const_d, data_keylarge_d, blockhash_half_d, target_d, resnonces_d, startNonce_d, fix_rand, fix_randex, acc_d;
-	size_t		    global_ws;
-	size_t          local_work_size = 256;
-	uint32_t		nonces_total = 0;
-	uint64_t		*nonce_ptr;
-	uint32_t        *nonce_sum;
-
-	unsigned char block_41970[] = { 0xfd, 0x40, 0x05, 0x01 };
-
-	uint8_t full_data[140 + 3 + 1344] = { 0 };
-	uint8_t* sol_data = &full_data[140];
-
-	blockhash_half = (uint8_t*)malloc(sizeof(uint8_t) * 64);
-	ptarget = (uint8_t *)malloc(sizeof(uint8_t) * 32);
-	pnonces = (uint32_t *)malloc(sizeof(uint32_t) * 1);
-	nonce_sum = (uint32_t *)malloc(sizeof(uint32_t) * 1);
-	data_key = (u128 *)malloc(VERUS_KEY_SIZE);
-	uint32_t num_sols;
-
-	key_const_d = check_clCreateBuffer(ctx, CL_MEM_READ_ONLY, sizeof(uint8_t) * VERUS_KEY_SIZE, NULL);
 	blockhash_half_d = check_clCreateBuffer(ctx, CL_MEM_READ_ONLY, sizeof(uint8_t) * 64, NULL);
 	target_d = check_clCreateBuffer(ctx, CL_MEM_READ_ONLY, sizeof(uint8_t) * 32, NULL);
 	resnonces_d = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(uint32_t) * 2, NULL);
 	startNonce_d = check_clCreateBuffer(ctx, CL_MEM_READ_ONLY, sizeof(uint32_t) * 2, NULL);
-	data_keylarge_d = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(uint8_t) * VERUS_KEY_SIZE * VERUS_WORKSIZE, NULL);
-	fix_rand = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(uint32_t) * VERUS_WORKSIZE * 32, NULL);
-	fix_randex = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(uint32_t) * VERUS_WORKSIZE * 32, NULL);
+	data_keylarge_d = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(uint8_t) * VERUS_KEY_SIZE * VERUS_PACKET, NULL);
 	nonce_ptr = (uint64_t *)(header + ZCASH_BLOCK_HEADER_LEN - ZCASH_NONCE_LEN);
-	acc_d = check_clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(uint64_t) * VERUS_WORKSIZE, NULL);
-//	InitializeCriticalSection(&cs);
-
+#ifdef WIN32
+	InitializeCriticalSection(&cs);
+#endif
 	puts("SILENTARMY mining mode ready");
 	fflush(stdout);
-//	SetConsoleOutputCP(65001);
+#ifdef WIN32
+	SetConsoleOutputCP(65001);
+#endif
 	int started = 0;
-	while (1)
+	for (i = 0; ; i++)
 	{
 		int changed = 0;
 		// iteration #0 always reads a job or else there is nothing to do
@@ -1703,27 +959,30 @@ void mining_mode(cl_device_id dev_id, cl_program program, cl_context ctx, cl_com
 		nonce_sum[0] = 0;
 		if (read_last_line(line, sizeof(line), !i)) {
 			changed = 1; started = 1;
-	//		EnterCriticalSection(&cs);
+#ifdef WIN32
+			EnterCriticalSection(&cs);
+#endif
 			mining_parse_job(line,
 				target, sizeof(target),
 				job_id, sizeof(job_id),
 				header, ZCASH_BLOCK_HEADER_LEN,
 				&fixed_nonce_bytes);
-	//		LeaveCriticalSection(&cs);
-	
+#ifdef WIN32
+			LeaveCriticalSection(&cs);
+#endif
 			memcpy(full_data, header, 140);
 			memcpy(sol_data, block_41970, 4);
 			//memcpy(full_data, data, 1487);
 
 			VerusHashHalf(blockhash_half, (unsigned char*)full_data, 1487);
-			GenNewCLKey((unsigned char*)blockhash_half, data_key);  
+			GenNewCLKey((unsigned char*)blockhash_half, data_key);
 			for (int j = 0; j < 32; j++)
 				ptarget[j] = target[j];
 
 			pnonces[0] = 0xfffffffful;
 			nonce_sum[0] = 0x0ul;
-		// send header,key,target to GPU verus_setBlock(blockhash_half, target, (uint8_t*)data_key, throughput); //set data to gpu kernel
-		
+			// send header,key,target to GPU verus_setBlock(blockhash_half, target, (uint8_t*)data_key, throughput); //set data to gpu kernel
+
 		}
 		else if (nonce_sum[0] == 0)  //main nonce needs incrementing
 		{
@@ -1757,16 +1016,6 @@ void mining_mode(cl_device_id dev_id, cl_program program, cl_context ctx, cl_com
 				status = clEnqueueWriteBuffer(queue, key_const_d, CL_TRUE, 0, sizeof(uint8_t) * VERUS_KEY_SIZE, data_key, 0, NULL, NULL);
 				if (status != CL_SUCCESS)printf("clEnqueueWriteBuffer (%d)\n", status);
 
-				check_clSetKernelArg(k_verus[0], 0, &key_const_d);
-				check_clSetKernelArg(k_verus[0], 1, &data_keylarge_d);
-
-
-				global_ws = VERUS_WORKSIZE * 128;
-				local_work_size = 128;
-
-				check_clEnqueueNDRangeKernel(queue, k_verus[0], 1, NULL,
-					&global_ws, &local_work_size, 0, NULL, NULL);
-				clFinish(queue);
 
 			}
 
@@ -1780,67 +1029,38 @@ void mining_mode(cl_device_id dev_id, cl_program program, cl_context ctx, cl_com
 			check_clSetKernelArg(k_verus[1], 0, &startNonce_d);
 			check_clSetKernelArg(k_verus[1], 1, &blockhash_half_d);
 			check_clSetKernelArg(k_verus[1], 2, &data_keylarge_d);
-			check_clSetKernelArg(k_verus[1], 3, &acc_d);
-			check_clSetKernelArg(k_verus[1], 4, &fix_rand);
-			check_clSetKernelArg(k_verus[1], 5, &fix_randex);
+			check_clSetKernelArg(k_verus[1], 3, &key_const_d);
+			check_clSetKernelArg(k_verus[1], 4, &target_d);
+			check_clSetKernelArg(k_verus[1], 5, &resnonces_d);
 
-			global_ws = VERUS_WORKSIZE;
-			local_work_size = MAIN_THREADS;
+			global_ws = blocks;
+			local_work_size = gthreads;
 
 			check_clEnqueueNDRangeKernel(queue, k_verus[1], 1, NULL,
 				&global_ws, &local_work_size, 0, NULL, NULL);
 
-			clFinish(queue);  //maybe remove???
-
-			check_clSetKernelArg(k_verus[2], 0, &startNonce_d);
-			check_clSetKernelArg(k_verus[2], 1, &blockhash_half_d);
-			check_clSetKernelArg(k_verus[2], 2, &target_d);
-			check_clSetKernelArg(k_verus[2], 3, &resnonces_d);
-			check_clSetKernelArg(k_verus[2], 4, &data_keylarge_d);
-			check_clSetKernelArg(k_verus[2], 5, &acc_d);
-
-
-			global_ws = VERUS_WORKSIZE;
-			local_work_size = 256;
-
-			check_clEnqueueNDRangeKernel(queue, k_verus[2], 1, NULL,
-				&global_ws, &local_work_size, 0, NULL, NULL);
-
-			clFinish(queue);
-
 			num_sols = verify_nonce(queue, resnonces_d, header,
 				fixed_nonce_bytes, target, job_id, shares, blockhash_half, pnonces);
 
-			check_clSetKernelArg(k_verus[3], 0, &key_const_d);
-			check_clSetKernelArg(k_verus[3], 1, &data_keylarge_d);
-			check_clSetKernelArg(k_verus[3], 2, &fix_rand);
-			check_clSetKernelArg(k_verus[3], 3, &fix_randex);
-
-			global_ws = VERUS_WORKSIZE * 32;
-			local_work_size = 32;
-
-			check_clEnqueueNDRangeKernel(queue, k_verus[3], 1, NULL,
-				&global_ws, &local_work_size, 0, NULL, NULL);
-
-			clFinish(queue);
-
-			total += VERUS_WORKSIZE;
+			total += blocks;
 			total_shares += num_sols;
-			if ((nonce_sum[0] + VERUS_WORKSIZE) < 0xfffffffful)
-				nonce_sum[0] += VERUS_WORKSIZE;
+			if ((nonce_sum[0] + blocks) < 0xfffffffful)
+				nonce_sum[0] += blocks;
 			else
 				nonce_sum[0] = 0;
 
 
 			if ((t1 = now()) > t0 + status_period)
 			{
-
-	//			EnterCriticalSection(&cs);
+#ifdef WIN32
+				EnterCriticalSection(&cs);
 				t0 = t1;
-
+#endif
 				printf("status: %" PRId64 " %" PRId64 "\n", total / 1000000, total_shares);
 				fflush(stdout);
-		//		LeaveCriticalSection(&cs);
+#ifdef WIN32
+				LeaveCriticalSection(&cs);
+#endif
 				//fprintf(stderr, " (%d kh/s)\n",
 				//	(t3 - t2) / 1e3, total / ((t3 - t2) / 1e6) / 1000);
 				//fflush(stdout);
@@ -1851,7 +1071,7 @@ void mining_mode(cl_device_id dev_id, cl_program program, cl_context ctx, cl_com
 
 
 }
-#endif
+
 
 void run_opencl(uint8_t *header, size_t header_len, cl_device_id *dev_id, cl_context ctx,
 	cl_command_queue queue, cl_program program, cl_kernel *k_verus)
@@ -1860,7 +1080,7 @@ void run_opencl(uint8_t *header, size_t header_len, cl_device_id *dev_id, cl_con
 	uint64_t		nonce;
 	uint64_t		total;
 
-		mining_mode(*dev_id, program, ctx, queue, k_verus, header);
+	mining_mode(*dev_id, program, ctx, queue, k_verus, header);
 
 }
 
@@ -1987,39 +1207,33 @@ void init_and_run_opencl(uint8_t *header, size_t header_len)
 	source_len = strlen(source);
 	cl_program program;
 
-		program = clCreateProgramWithSource(context, 1, (const char **)&source,
-			&source_len, &status);
-		if (status != CL_SUCCESS || !program)
-			fatal("clCreateProgramWithSource (%d)\n", status);
-		/* Build program. */
-		if (!mining || verbose)
-			fprintf(stderr, "Building program\n");
-		status = clBuildProgram(program, 1, &dev_id,
-			"", // compile options
-			NULL, NULL);
-		if (status != CL_SUCCESS)
-		{
-			printf("OpenCL build failed (%d). Build log follows:\n", status);
-			get_program_build_log(program, dev_id);
-			fflush(stdout);
-			exit(1);
-		}
-		get_program_bins(program);
-		// Create kernel objects
-		
-		k_verus[0] = clCreateKernel(program, "verus_key", &status);
-		if (status != CL_SUCCESS || !k_verus[0])
-			fatal("clCreateKernel1 (%d)\n", status);
-		k_verus[1] = clCreateKernel(program, "verus_gpu_hash", &status);
-		if (status != CL_SUCCESS || !k_verus[1])
-			fatal("clCreateKernel2 (%d)\n", status);
-		k_verus[2] = clCreateKernel(program, "verus_gpu_final", &status);
-		if (status != CL_SUCCESS || !k_verus[2])
-			fatal("clCreateKernel3 (%d)\n", status);
-		k_verus[3] = clCreateKernel(program, "verus_extra_gpu_fix", &status);
-		if (status != CL_SUCCESS || !k_verus[3])
-			fatal("clCreateKernel4 (%d)\n", status);
-	
+	program = clCreateProgramWithSource(context, 1, (const char **)&source,
+		&source_len, &status);
+	if (status != CL_SUCCESS || !program)
+		fatal("clCreateProgramWithSource (%d)\n", status);
+	/* Build program. */
+	if (!mining || verbose)
+		fprintf(stderr, "Building program\n");
+
+	char* yy = (char*)malloc(100);  sprintf(yy, "-D TOTAL_MAX=%d -D THREADS=%d", VERUS_PACKET - 1, MAIN_THREADS);
+
+	status = clBuildProgram(program, 1, &dev_id, yy, // compile options
+		NULL, NULL);
+	if (status != CL_SUCCESS)
+	{
+		printf("OpenCL build failed (%d). Build log follows:\n", status);
+		get_program_build_log(program, dev_id);
+		fflush(stdout);
+		exit(1);
+	}
+	get_program_bins(program);
+	// Create kernel objects
+
+
+	k_verus[1] = clCreateKernel(program, "verus_gpu_hash", &status);
+	if (status != CL_SUCCESS || !k_verus[1])
+		fatal("clCreateKernel2 (%d)\n", status);
+
 
 	// Run
 	run_opencl(header, header_len, &dev_id, context, queue, program, k_verus);
@@ -2163,6 +1377,5 @@ int main(int argc, char **argv)
 	init_and_run_opencl(header, header_len);
 	return 0;
 }
-
 
 
