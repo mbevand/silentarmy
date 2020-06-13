@@ -1,33 +1,27 @@
-# SILENTARMY verus coin by monkins1010
+# SILENTARMY Standalone Version for Windows x86_64
 
-`Quick instructions:`
+[Download precompiled binaries (v5-win64standalone-r12)](https://github.com/zawawawa/silentarmy/releases/tag/v5-win64standalone-r12) (Developmental)
 
-`mkdir silent`
+[Download precompiled binaries (v5-win64standalone-r7)](https://github.com/zawawawa/silentarmy/releases/download/v5-win64standalone-r7/silentarmy-v5-win64standalone-r7.zip) (Stable)
 
-`cd silent`
+This is a standalone Windows x86_64 port of SILENTARMY v5, which does not require Python, based on [Genoil's Windows port](https://github.com/Genoil/silentarmy/tree/windows). All you have to do for mining is to run `list.bat` to get device ID's and edit and run `silentarmy.bat`. MAKE SURE TO SPECIFY CORRECT DEVICE IDS WITH THE `--use` OPTION! See the documentation of the original SILENTARMY below for details.
 
-`git clone https://github.com/monkins1010/AMDVerusCoin.git`
+You may get the following error if you have missing DLL's on your system: `The application was unable to start correctly (0xc000007b)` In this case, you need to delete `vcruntime140.dll` in the package and install [Visual C++ 2015 Redistribution Package](https://www.microsoft.com/en-us/download/details.aspx?id=48145).
 
-`cd AMDVerusCoin`
+If you find this port useful and/or would like to see a feature-rich ZEC miner based on it, please consider donations to: `t1NwUDeSKu4BxkD58mtEYKDjzw5toiLfmCu`
 
-`make`
+Last but not least, mrb, nerdralph, eXtremal, and Genoil, thank you all so much for the great work. You guys are 
+truly the cream of the FOSS movement.
 
-`nano run`
+zawawa @ bitcointalk.org
 
-change the text to
+# SILENTARMY
 
-`./silentarmy --use=0,1,2 --instances=1`
+Official site: https://github.com/mbevand/silentarmy
 
-`ctrl + x  y  then enter`
-
-`chmod +x run`
-
-**Very important --instances=1** 
-
-Written for the community BTC donations to Monkins1010 3HNYjR3FoVLpnZsjTNnPc51kt8g6gu3YfJ if you are so inclined :-)
-
-SILENTARMY Veruscoin is a free open source Opencl Veruscoin www.veruscoin.io  miner for Linux
-with multi-GPU and [Stratum](https://github.com/str4d/zips/blob/77-zip-stratum/drafts/str4d-stratum/draft1.rst) support. It is written in OpenCL and is designed to run on AMD/Nvidia/Intel GPUs, Xeon Phi, and more.
+SILENTARMY is a free open source [Zcash](https://z.cash) miner for Linux
+with multi-GPU and [Stratum](https://github.com/str4d/zips/blob/77-zip-stratum/drafts/str4d-stratum/draft1.rst) support. It is written in OpenCL and has been tested
+on AMD/Nvidia/Intel GPUs, Xeon Phi, and more.
 
 After compiling SILENTARMY, list the available OpenCL devices:
 
@@ -35,18 +29,18 @@ After compiling SILENTARMY, list the available OpenCL devices:
 $ silentarmy --list
 ```
 
-Start mining with three GPUs (ID 0,1,2) on a pool:
+Start mining with two GPUs (ID 2 and ID 5) on a pool:
 
 ```
-$ silentarmy --use 0,1,3 -c stratum+tcp://stratum.veruspool.xyz:9999 -u REoPcdGXthL5yeTCrJtrQv5xhYTknbFbec.monkins
+$ silentarmy --use 2,5 -c stratum+tcp://us1-zcash.flypool.org:3333 -u t1cVviFvgJinQ4w3C2m2CfRxgP5DnHYaoFC
 ```
 
 When run without options, SILENTARMY mines with the first OpenCL device, using
-my donation address, on veruspool:
+my donation address, on flypool:
 
 ```
 $ silentarmy
-Connecting to stratum.veruspool.xyz:9999
+Connecting to us1-zcash.flypool.org:3333
 Stratum server sent us the first job
 Mining on 1 device
 Total 0.0 sol/s [dev0 0.0] 0 shares
@@ -71,22 +65,17 @@ Options:
                         use the first three: 0,1,2 (default: 0)
   --instances=N         run N instances of Equihash per GPU (default: 2)
   -c POOL, --connect=POOL
-                        connect to POOL, for example
-                        stratum+tcp://example.com:1234 (add "#xnsub" to enable
-                        extranonce.subscribe)
+                        connect to POOL, for example:
+                        stratum+tcp://example.com:1234
   -u USER, --user=USER  username for connecting to the pool
   -p PWD, --pwd=PWD     password for connecting to the pool
 ```
 
 # Performance
 
-| Vendor | Type | Model      | sol/s |
-|--------|------|------------|-------|
-| AMD    | GPU  | R9 Nano    | 115   |
-| AMD    | GPU  | R9 390X    | 100   |
-| AMD    | GPU  | R9 390     | 95    |
-| AMD    | GPU  | RX 480 8GB | 75    |
-| NVIDIA | GPU  | GTX 1070   | 70    |
+* 115 sol/s with one R9 Nano
+* 75 sol/s with one RX 480 8GB
+* 70 sol/s with one GTX 1070
 
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md#performance) to resolve performance
 issues.
@@ -110,10 +99,10 @@ subsection below:
 ### Ubuntu 16.04 / amdgpu
 
 1. Download the [AMDGPU-PRO Driver](http://support.amd.com/en-us/kb-articles/Pages/AMDGPU-PRO-Install.aspx)
-(as of 12 Dec 2016, the latest version is 16.50).
+(as of 30 Oct 2016, the latest version is 16.40).
 
 2. Extract it:
-   `$ tar xf amdgpu-pro-16.50-362463.tar.xz`
+   `$ tar xf amdgpu-pro-16.40-348864.tar.xz`
 
 3. Install (non-root, will use sudo access automatically):
    `$ ./amdgpu-pro-install`
@@ -148,14 +137,6 @@ subsection below:
 
 2. Either reboot, or load the kernel driver:
    `$ sudo modprobe nvidia_361`
-   
-### Ubuntu 16.04 / Intel
-
-1. Install the OpenCL headers and library:
-    `$ sudo apt-get install beignet-opencl-icd`
-    
-2. You must either alter the Makefile below or build silentarmy using
-    ` make OPENCL_HEADERS=/usr/lib/x86_64-linux-gnu/beignet/include/ LIBOPENCL=/usr/lib/x86_64-linux-gnu/beignet/ LDLIBS="-lcl -lrt"`
 
 ## Step 2: Python 3.3
 
@@ -173,11 +154,11 @@ subsection below:
 
 ## Step 4: Get SILENTARMY
 
-Download it as a https://github.com/monkins1010/AMDVerusCoin.git
+Download it as a ZIP from github: https://github.com/mbevand/silentarmy/archive/master.zip
 
 Or clone it from the command line:
-`$ git clone 
-https://github.com/monkins1010/AMDVerusCoin.git
+`$ git clone https://github.com/mbevand/silentarmy.git`
+
 Or, for Arch Linux users, get the
 [silentarmy AUR package](https://aur.archlinux.org/packages/silentarmy/).
 
@@ -302,21 +283,9 @@ Donations welcome: t1cVviFvgJinQ4w3C2m2CfRxgP5DnHYaoFC
 I would like to thank these persons for their contributions to SILENTARMY,
 in alphabetical order:
 * eXtremal
-* jramos
 * kenshirothefist
-* Kubuxu
 * lhl
 * nerdralph
 * poiuty
 * solardiz
 
-# License
-
-The MIT License (MIT)
-Copyright (c) 2016 Marc Bevand
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

@@ -8,11 +8,12 @@ CC = gcc
 CPPFLAGS = -I${OPENCL_HEADERS}
 CFLAGS = -O2 -std=gnu99 -pedantic -Wextra -Wall \
     -Wno-deprecated-declarations \
-    -Wno-overlength-strings
+    -Wno-overlength-strings \
+    -Wno-unused-parameter
 LDFLAGS = -rdynamic -L${LIBOPENCL}
-LDLIBS = -lOpenCL -lrt
-OBJ = main.o sha256.o haraka_portable.o
-INCLUDES = param.h _kernel.h sha256.h haraka.h
+LDLIBS = -lOpenCL
+OBJ = main.o haraka_portable.o sha256.o
+INCLUDES =  param.h _kernel.h sha256.h haraka_portable.h
 
 all : sa-solver
 
@@ -21,7 +22,7 @@ sa-solver : ${OBJ}
 
 ${OBJ} : ${INCLUDES}
 
-_kernel.h : verus.cl 
+_kernel.h : input.cl param.h
 	echo 'const char *ocl_code = R"_mrb_(' >$@
 	cpp $< >>$@
 	echo ')_mrb_";' >>$@

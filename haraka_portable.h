@@ -1,7 +1,7 @@
 #ifndef SPX_HARAKA_H
 #define SPX_HARAKA_H
 
-#include "immintrin.h"
+#include "emmintrin.h"
 
 #define NUMROUNDS 5
 
