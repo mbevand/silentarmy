@@ -479,9 +479,11 @@ void case_0c(uint128m *prand, uint128m *prandex, const  uint128m *pbuf,
 	}
 	else
 	{
-		 uint128m tempb3 = prandex[0];
+		uint128m tempb3 = prandex[0];
 		prandex[0] = tempa2;
 		prand[0] = tempb3;
+		uint128m tempb4 = pbuf[0];
+		acc[0] = _mm_xor_si128_emu(tempb4, acc[0]);
 	}
 }
 
@@ -590,10 +592,10 @@ void case_18(uint128m *prand, uint128m *prandex, const  uint128m *pbuf,
 			{
 				onekey = rc[0]; rc++; 
 				const uint128m temp2 = _mm_load_si128_emu(rounds & 1 ? pbuf : buftmp);
-				const uint128m add1 = _mm_xor_si128_emu(onekey, temp2);
+				onekey = _mm_xor_si128_emu(onekey, temp2);
 
 				const int32_t divisor = (uint32_t)selector;
-				const int64_t dividend = ((int64_t*)&add1)[0];
+				const int64_t dividend = ((int64_t*)&onekey)[0];
 				uint128m modulo = { 0,0,0,0 }; ((int32_t*)&modulo)[0] = (dividend % divisor);
 				acc[0] = _mm_xor_si128_emu(modulo , acc[0]);
 
@@ -603,8 +605,8 @@ void case_18(uint128m *prand, uint128m *prandex, const  uint128m *pbuf,
 				onekey = rc[0]; rc++; 
 				uint128m temp2 = _mm_load_si128_emu(rounds & 1 ? buftmp : pbuf);
 				uint128m add1 = _mm_xor_si128_emu(onekey, temp2);
-				uint128m clprod1 = _mm_clmulepi64_si128_emu(add1, add1, 0x10);
-				uint128m clprod2 = _mm_mulhrs_epi16_emu(acc[0], clprod1);
+				onekey = _mm_clmulepi64_si128_emu(add1, add1, 0x10);
+				uint128m clprod2 = _mm_mulhrs_epi16_emu(acc[0], onekey);
 				acc[0] = clprod2^ acc[0];
 			}
 		}while(rounds--);
@@ -612,8 +614,8 @@ void case_18(uint128m *prand, uint128m *prandex, const  uint128m *pbuf,
 
 	const uint128m tempa3 = (prandex[0]);
 	const uint128m tempa4 = _mm_xor_si128_emu(tempa3, acc[0]);
-	prandex[0] = tempa4;
-	prand[0] = onekey;
+	prandex[0] = onekey;
+	prand[0] = tempa4;
 }
 
 void case_1c(uint128m *prand, uint128m *prandex, const  uint128m *pbuf,
@@ -634,7 +636,8 @@ void case_1c(uint128m *prand, uint128m *prandex, const  uint128m *pbuf,
 	prand[0] = tempa2;
 
 	acc[0] = _mm_xor_si128_emu(tempa3, acc[0]);
-
+	uint128m temp4 = _mm_load_si128_emu(pbuf - (((selector & 1) << 1) - 1));
+	acc[0] = _mm_xor_si128_emu(temp4, acc[0]);
 	 uint128m tempb1 = _mm_mulhrs_epi16_emu(acc[0], tempa3);
 	 uint128m tempb2 = _mm_xor_si128_emu(tempb1, tempa3);
 	prandex[0] = tempb2;
@@ -834,7 +837,7 @@ __kernel void verus_gpu_hash(__constant uint *startNonce,
 		sharedMemory1[2][i] = saes_table[2][i];
 		sharedMemory1[3][i] = saes_table[3][i];
 	}
-	barrier(CLK_LOCAL_MEM_FENCE); //sync sharedmem
+	//mem_fence(CLK_LOCAL_MEM_FENCE); //sync sharedmem
 	if (startNonce[0] == 0) {
 		for (int i = 0; i < VERUS_KEY_SIZE128; i++) {
 
