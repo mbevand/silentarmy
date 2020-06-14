@@ -663,7 +663,7 @@ uint32_t verify_nonce(cl_command_queue queue, cl_mem nonces_d,
 		if (vhash[7] >= Htarg || fulltest(vhash, (uint32_t*)target)) {
 			((uint32_t*)&buffer)[333] = winning_n & 0xffffffff;
 			//	((uint32_t*)&buffer)[334] = winning_n >> 32;
-			buffer[0] = 0xfd; buffer[1] = 0x40; buffer[2] = 0x05; buffer[3] = 0x04;
+			buffer[0] = 0xfd; buffer[1] = 0x40; buffer[2] = 0x05; buffer[3] = 0x05;
 			sh = 1;
 
 			debug("Hash is under target\n");
@@ -923,7 +923,7 @@ void mining_mode(cl_device_id dev_id, cl_program program, cl_context ctx, cl_com
 	uint64_t		*nonce_ptr;
 	uint32_t        *nonce_sum;
 
-	unsigned char block_41970[] = { 0xfd, 0x40, 0x05, 0x04 };
+	unsigned char block_41970[] = { 0xfd, 0x40, 0x05, 0x05 };
 
 	uint8_t full_data[140 + 3 + 1344] = { 0 };
 	uint8_t* sol_data = &full_data[140];
