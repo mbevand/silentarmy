@@ -426,13 +426,12 @@ class Silentarmy:
     def set_new_job(self, job_id, nversion, hash_prev_block, hash_merkle_root,
             hash_reserved, ntime, nbits, clean_jobs):
         verbose('Received job "%s"' % job_id)
-        if not clean_jobs:
-            verbose('Ignoring job "%s" (clean_jobs=False)' % job_id)
-            return
+    #    if not clean_jobs:
+    #        verbose('Ignoring job "%s" (clean_jobs=False)' % job_id)
+     #       return
         self.job_id = job_id
-        #if nversion != '04000000':
-        if  not nversion.startswith('04000'):
-            raise Exception('Invalid version: %s' % nversion)
+      ##  if nversion != '04000000':
+       ##     raise Exception('Invalid version: %s' % nversion)
         if not re.match(r'^[0-9a-fA-F]{64}$', hash_prev_block):
             raise Exception('Invalid hashPrevBlock: %s' % hash_prev_block)
         if not re.match(r'^[0-9a-fA-F]{64}$', hash_merkle_root):
@@ -568,7 +567,7 @@ def main():
     parser.add_option(
             "--instances",
             dest="instances", action="store", type="int", metavar="N",
-            default=2,
+            default=1,
             help="run N instances of Equihash per GPU (default: 2)")
     parser.add_option(
             "-c", "--connect",

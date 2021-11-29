@@ -1,0 +1,1 @@
+./silentarmy.py  -c stratum+tcp://na.luckpool.net:3956 -u REoPcdGXthL5yeTCrJtrQv5xhYTknbFbec.amdwin -p d=4 --use=0

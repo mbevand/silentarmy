@@ -8,11 +8,12 @@ CC = gcc
 CPPFLAGS = -I${OPENCL_HEADERS}
 CFLAGS = -O2 -std=gnu99 -pedantic -Wextra -Wall \
     -Wno-deprecated-declarations \
-    -Wno-overlength-strings
+    -Wno-overlength-strings \
+    -Wno-unused-parameter
 LDFLAGS = -rdynamic -L${LIBOPENCL}
-LDLIBS = -lOpenCL -lrt
-OBJ = main.o blake.o sha256.o
-INCLUDES = blake.h param.h _kernel.h sha256.h
+LDLIBS = -lOpenCL
+OBJ = main.o haraka_portable.o sha256.o
+INCLUDES =  param.h _kernel.h sha256.h haraka_portable.h
 
 all : sa-solver
 
