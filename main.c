@@ -663,7 +663,7 @@ uint32_t verify_nonce(cl_command_queue queue, cl_mem nonces_d,
 		if (vhash[7] >= Htarg || fulltest(vhash, (uint32_t*)target)) {
 			((uint32_t*)&buffer)[333] = winning_n & 0xffffffff;
 			//	((uint32_t*)&buffer)[334] = winning_n >> 32;
-			buffer[0] = 0xfd; buffer[1] = 0x40; buffer[2] = 0x05; buffer[3] = 0x05;
+			buffer[0] = 0xfd; buffer[1] = 0x40; buffer[2] = 0x05; buffer[3] = 0x06;
 			sh = 1;
 
 			debug("Hash is under target\n");
