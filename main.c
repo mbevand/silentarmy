@@ -923,7 +923,7 @@ void mining_mode(cl_device_id dev_id, cl_program program, cl_context ctx, cl_com
 	uint64_t		*nonce_ptr;
 	uint32_t        *nonce_sum;
 
-	unsigned char block_41970[] = { 0xfd, 0x40, 0x05, 0x05 };
+	unsigned char block_41970[] = { 0xfd, 0x40, 0x05, 0x06 };
 
 	uint8_t full_data[140 + 3 + 1344] = { 0 };
 	uint8_t* sol_data = &full_data[140];
